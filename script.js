@@ -10,14 +10,22 @@ const STORAGE_KEYS = {
     PRODUCTS: "ajanta_products_catalog",
     LEADS: "ajanta_quote_leads",
     REVIEWS: "ajanta_client_reviews",
+    USERS: "ajanta_registered_users",
+    ACTIVE_USER: "ajanta_active_user",
     AUTH: "ajanta_admin_auth_config",
     SESSION: "ajanta_admin_logged_in"
 };
 
-const DEFAULT_AUTH = {
-    username: "sunny",
-    password: "ajanta76"
-};
+const DEFAULT_USERS = [
+    {
+        id: "usr-sunny",
+        name: "Sunny Mehta",
+        mobile: "9215400355",
+        username: "sunny",
+        password: "ajantaDAWS1976",
+        createdAt: "2026-01-01T00:00:00.000Z"
+    }
+];
 
 const FACTORY_PRODUCTS = [
     {
@@ -98,14 +106,67 @@ let activeLeadStatusFilter = "ALL";
 // ==========================================
 // 1. AUTHENTICATION & SESSION MANAGEMENT
 // ==========================================
-function getStoredAuth() {
+function getRegisteredUsers() {
     try {
-        const stored = localStorage.getItem(STORAGE_KEYS.AUTH);
+        const stored = localStorage.getItem(STORAGE_KEYS.USERS);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch (e) {
+        console.warn("Registered users read failed:", e);
+    }
+    return DEFAULT_USERS;
+}
+
+function saveRegisteredUsers(users) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+    } catch (e) {
+        console.warn("Failed to save users:", e);
+    }
+}
+
+function switchAuthMode(mode) {
+    const loginForm = document.getElementById("adminLoginForm");
+    const registerForm = document.getElementById("adminRegisterForm");
+    const tabLogin = document.getElementById("authTab-login");
+    const tabRegister = document.getElementById("authTab-register");
+    const loginErr = document.getElementById("loginError");
+    const regErr = document.getElementById("registerError");
+
+    if (loginErr) loginErr.classList.add("hidden");
+    if (regErr) regErr.classList.add("hidden");
+
+    if (mode === "register") {
+        if (loginForm) loginForm.classList.add("hidden");
+        if (registerForm) registerForm.classList.remove("hidden");
+        if (tabRegister) {
+            tabRegister.className = "flex-1 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow";
+        }
+        if (tabLogin) {
+            tabLogin.className = "flex-1 py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white";
+        }
+    } else {
+        if (registerForm) registerForm.classList.add("hidden");
+        if (loginForm) loginForm.classList.remove("hidden");
+        if (tabLogin) {
+            tabLogin.className = "flex-1 py-2 rounded-xl text-xs font-bold transition bg-cyan-600 text-white shadow";
+        }
+        if (tabRegister) {
+            tabRegister.className = "flex-1 py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white";
+        }
+    }
+}
+
+function getActiveUser() {
+    try {
+        const stored = sessionStorage.getItem(STORAGE_KEYS.ACTIVE_USER);
         if (stored) return JSON.parse(stored);
     } catch (e) {
-        console.warn("Auth config read failed:", e);
+        console.warn("Active user read error:", e);
     }
-    return DEFAULT_AUTH;
+    return { name: "Sunny Mehta", mobile: "9876543210", username: "sunny" };
 }
 
 function checkAuthSession() {
@@ -120,27 +181,135 @@ function checkAuthSession() {
     } else {
         if (loginScreen) loginScreen.classList.remove("hidden");
         if (dashboardApp) dashboardApp.classList.add("hidden");
+        // Ensure all login and register inputs are completely clean and unpopulated
+        const loginUser = document.getElementById("loginUsername");
+        const loginPass = document.getElementById("loginPassword");
+        const regPass = document.getElementById("regPassword");
+        const regConf = document.getElementById("regConfirmPassword");
+        if (loginUser) loginUser.value = "";
+        if (loginPass) loginPass.value = "";
+        if (regPass) regPass.value = "";
+        if (regConf) regConf.value = "";
     }
+}
+
+function handleRegisterSubmit(e) {
+    if (e) e.preventDefault();
+    const name = document.getElementById("regName")?.value?.trim() || "";
+    const mobileRaw = document.getElementById("regMobile")?.value?.trim() || "";
+    const username = document.getElementById("regUsername")?.value?.trim() || "";
+    const password = document.getElementById("regPassword")?.value || "";
+    const confirmPassword = document.getElementById("regConfirmPassword")?.value || "";
+    const errBox = document.getElementById("registerError");
+
+    function showRegError(msg) {
+        if (errBox) {
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
+            errBox.classList.remove("hidden");
+        }
+    }
+
+    if (!name) {
+        showRegError("Please enter your Full Name.");
+        return;
+    }
+
+    // Clean mobile number (strip any spaces or special characters)
+    const cleanMobile = mobileRaw.replace(/[^0-9]/g, "");
+    if (cleanMobile.length !== 10) {
+        showRegError("Please enter a valid 10-digit mobile number.");
+        return;
+    }
+
+    if (username.length < 3) {
+        showRegError("Username must be at least 3 characters long.");
+        return;
+    }
+
+    if (password.length < 4) {
+        showRegError("Password must be at least 4 characters long.");
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        showRegError("Passwords do not match. Please verify.");
+        return;
+    }
+
+    const users = getRegisteredUsers();
+
+    // 🔒 STRICT UNIQUE MOBILE NUMBER VALIDATION: 1 Mobile = 1 Account
+    const existingMobile = users.find(u => (u.mobile || "").replace(/[^0-9]/g, "") === cleanMobile);
+    if (existingMobile) {
+        showRegError(`Mobile number +91 ${cleanMobile} is already registered. Only 1 account is permitted per mobile number. Please Sign In.`);
+        return;
+    }
+
+    // STRICT UNIQUE USERNAME VALIDATION
+    const existingUser = users.find(u => (u.username || "").toLowerCase() === username.toLowerCase());
+    if (existingUser) {
+        showRegError(`Username '${username}' is already taken. Please choose another username.`);
+        return;
+    }
+
+    // Create and save new user
+    const newUser = {
+        id: `usr-${Date.now()}`,
+        name: name,
+        mobile: cleanMobile,
+        username: username,
+        password: password,
+        createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    saveRegisteredUsers(users);
+
+    // Automatically authenticate the new user
+    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(newUser));
+
+    if (errBox) errBox.classList.add("hidden");
+    showToast(`Account created! Welcome, ${name}`, "fa-user-check");
+    checkAuthSession();
 }
 
 function handleLoginSubmit(e) {
     if (e) e.preventDefault();
-    const userIn = document.getElementById("loginUsername")?.value?.trim() || "";
-    const passIn = document.getElementById("loginPassword")?.value?.trim() || "";
+    const identifier = document.getElementById("loginUsername")?.value?.trim() || "";
+    const passIn = document.getElementById("loginPassword")?.value || "";
     const errBox = document.getElementById("loginError");
 
-    const auth = getStoredAuth();
-
-    if (userIn.toLowerCase() === auth.username.toLowerCase() && passIn === auth.password) {
-        sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-        if (errBox) errBox.classList.add("hidden");
-        showToast("Welcome Sunny Mehta! Admin session active", "fa-circle-check");
-        checkAuthSession();
-    } else {
+    function showLogErr(msg) {
         if (errBox) {
-            errBox.textContent = "Invalid username or password. Default: sunny / ajanta76";
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
             errBox.classList.remove("hidden");
         }
+    }
+
+    if (!identifier || !passIn) {
+        showLogErr("Please enter both username/mobile and password.");
+        return;
+    }
+
+    const users = getRegisteredUsers();
+    const cleanId = identifier.replace(/[^0-9]/g, "");
+
+    // Check by username OR 10-digit mobile number
+    const matchedUser = users.find(u => {
+        const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
+        const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
+        return (matchUser || matchMob) && u.password === passIn;
+    });
+
+    if (matchedUser) {
+        sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
+        if (errBox) errBox.classList.add("hidden");
+        showToast(`Welcome ${matchedUser.name}! Admin session active`, "fa-circle-check");
+        checkAuthSession();
+    } else {
+        showLogErr("Invalid username/mobile number or password. If you are a new user, click Create Account.");
     }
 }
 
@@ -159,23 +328,30 @@ function toggleLoginPassword() {
 
 function handleLogout() {
     sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+    sessionStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
     showToast("Logged out securely", "fa-lock");
     checkAuthSession();
 }
 
 function saveNewCredentials(e) {
     if (e) e.preventDefault();
-    const newUser = document.getElementById("settingUsername")?.value?.trim();
+    const activeUser = getActiveUser();
     const newPass = document.getElementById("settingPassword")?.value?.trim();
 
-    if (!newUser || !newPass) {
-        alert("Please enter both username and password");
+    if (!newPass) {
+        alert("Please enter a new password");
         return;
     }
 
-    const newAuth = { username: newUser, password: newPass };
-    localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(newAuth));
-    showToast("Admin credentials updated successfully", "fa-key");
+    const users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.username === activeUser.username || u.mobile === activeUser.mobile);
+    if (idx !== -1) {
+        users[idx].password = newPass;
+        saveRegisteredUsers(users);
+        activeUser.password = newPass;
+        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+        showToast("Password updated successfully", "fa-key");
+    }
 }
 
 
@@ -183,6 +359,18 @@ function saveNewCredentials(e) {
 // 2. DASHBOARD INITIALIZATION & TABS
 // ==========================================
 function initDashboard() {
+    const activeUser = getActiveUser();
+    const nameEl = document.getElementById("currentLoggedUserName");
+    const mobileEl = document.getElementById("currentLoggedUserMobile");
+    if (nameEl) nameEl.textContent = activeUser.name || "Administrator";
+    if (mobileEl && activeUser.mobile) mobileEl.textContent = `(+91 ${activeUser.mobile})`;
+
+    // Settings inputs
+    const setUsername = document.getElementById("settingUsername");
+    const setPass = document.getElementById("settingPassword");
+    if (setUsername) setUsername.value = activeUser.username || "";
+    if (setPass) setPass.value = "";
+
     updateBadgesAndStats();
     renderProductsGrid();
     renderLeadsTable();

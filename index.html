@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ajanta Admin Portal | Executive Management Suite</title>
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="../Main/favicon.svg">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -58,29 +58,40 @@
             <div class="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-            <div class="text-center mb-8 relative">
-                <div class="w-16 h-16 bg-cyan-950/60 border border-cyan-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 text-cyan-400 text-2xl shadow-lg shadow-cyan-950/50">
+            <div class="text-center mb-6 relative">
+                <div class="w-14 h-14 bg-cyan-950/60 border border-cyan-500/30 rounded-2xl flex items-center justify-center mx-auto mb-3 text-cyan-400 text-2xl shadow-lg shadow-cyan-950/50">
                     <i class="fa-solid fa-shield-halved"></i>
                 </div>
-                <span class="text-[10px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950/50 border border-cyan-800/40 px-3 py-1 rounded-full">Private Admin System</span>
-                <h1 class="text-2xl font-syne font-black text-white mt-3">Ajanta Management</h1>
-                <p class="text-xs text-slate-400 mt-1">Authorized access to products, inquiries & catalog</p>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950/50 border border-cyan-800/40 px-3 py-1 rounded-full">Executive Management Portal</span>
+                <h1 class="text-2xl font-syne font-black text-white mt-2">Ajanta Management</h1>
+                <p class="text-xs text-slate-400 mt-0.5">Secure portal for products, leads & catalog</p>
             </div>
 
-            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4 relative">
+            <!-- Auth Mode Switch Tabs -->
+            <div class="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-6">
+                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="flex-1 py-2 rounded-xl text-xs font-bold transition bg-cyan-600 text-white shadow">
+                    Sign In
+                </button>
+                <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="flex-1 py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white">
+                    Create Account
+                </button>
+            </div>
+
+            <!-- 1. SIGN IN FORM -->
+            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative">
                 <div>
-                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Username / Admin ID</label>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Username or Mobile Number</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-user"></i></span>
-                        <input type="text" id="loginUsername" value="sunny" required placeholder="Enter username" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="text" id="loginUsername" required autocomplete="off" placeholder="Enter username or 10-digit mobile" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Password / Master PIN</label>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Password</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-lock"></i></span>
-                        <input type="password" id="loginPassword" value="ajanta76" required placeholder="Enter password or PIN" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="password" id="loginPassword" required autocomplete="new-password" placeholder="Enter your password" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                         <button type="button" onclick="toggleLoginPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs">
                             <i id="loginPassIcon" class="fa-regular fa-eye"></i>
                         </button>
@@ -91,13 +102,59 @@
 
                 <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2 cursor-pointer mt-2">
                     <i class="fa-solid fa-right-to-bracket"></i>
-                    <span>Unlock Admin Portal</span>
+                    <span>Sign In to Admin Portal</span>
                 </button>
 
                 <div class="text-center pt-2">
-                    <a href="index.html" class="text-[11px] text-slate-500 hover:text-cyan-400 transition flex items-center justify-center gap-1.5">
+                    <a href="https://ajantaglass-sirsa.vercel.app/" class="text-[11px] text-slate-500 hover:text-cyan-400 transition flex items-center justify-center gap-1.5">
                         <i class="fa-solid fa-arrow-left text-[10px]"></i> Return to Public Website
                     </a>
+                </div>
+            </form>
+
+            <!-- 2. REGISTRATION FORM -->
+            <form id="adminRegisterForm" onsubmit="handleRegisterSubmit(event)" autocomplete="off" class="space-y-3.5 relative hidden">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Full Name *</label>
+                    <input type="text" id="regName" required autocomplete="off" placeholder="e.g. Sunny Mehta" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Mobile Number (1 Account per Mobile) *</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono font-bold">+91</span>
+                        <input type="tel" id="regMobile" required maxlength="10" autocomplete="off" placeholder="10-digit mobile number" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-12 pr-4 py-2.5 text-xs text-white font-mono placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                    <span class="text-[10px] text-slate-500 mt-1 block">Only 1 account can be registered with this mobile number.</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Choose Username *</label>
+                    <input type="text" id="regUsername" required autocomplete="off" placeholder="e.g. sunny_admin" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Choose Password *</label>
+                        <input type="password" id="regPassword" required autocomplete="new-password" placeholder="Min 4 characters" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Confirm Password *</label>
+                        <input type="password" id="regConfirmPassword" required autocomplete="new-password" placeholder="Repeat password" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div id="registerError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
+
+                <button type="submit" id="registerBtn" class="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Create Account & Sign In</span>
+                </button>
+
+                <div class="text-center pt-1">
+                    <button type="button" onclick="switchAuthMode('login')" class="text-[11px] text-slate-400 hover:text-cyan-400 transition">
+                        Already have an account? <span class="font-bold text-cyan-400">Sign In</span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -125,14 +182,14 @@
                                 <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Live
                             </span>
                         </div>
-                        <p class="text-[11px] text-slate-400">Owner Management Console • Sunny Mehta</p>
+                        <p class="text-[11px] text-slate-400">Management Console • <span id="currentLoggedUserName" class="font-bold text-cyan-300">Sunny Mehta</span> <span id="currentLoggedUserMobile" class="text-[10px] text-slate-500 font-mono ml-1"></span></p>
                     </div>
                 </div>
 
                 <!-- Right: Stats Badges & Actions -->
                 <div class="flex items-center flex-wrap gap-2 sm:gap-3">
                     <!-- Quick Public Website Link -->
-                    <a href="index.html" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                    <a href="https://ajantaglass-sirsa.vercel.app/" target="_blank" rel="noopener noreferrer" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
                         <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-cyan-400"></i>
                         <span>View Website</span>
                     </a>
@@ -358,14 +415,14 @@
                             </div>
                         </div>
 
-                        <form onsubmit="saveNewCredentials(event)" class="space-y-3">
+                        <form onsubmit="saveNewCredentials(event)" autocomplete="off" class="space-y-3">
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-300 mb-1">Admin Username</label>
-                                <input type="text" id="settingUsername" value="sunny" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                                <input type="text" id="settingUsername" readonly class="w-full bg-slate-950/70 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-400 focus:outline-none cursor-default">
                             </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-300 mb-1">New Password / PIN</label>
-                                <input type="text" id="settingPassword" placeholder="Enter new password" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                                <input type="password" id="settingPassword" autocomplete="new-password" placeholder="Enter new password" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
                             </div>
                             <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-bold py-2 px-4 rounded-xl transition cursor-pointer">
                                 Update Password
@@ -573,6 +630,6 @@
     </div>
 
     <!-- SCRIPT -->
-    <script src="admin.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
