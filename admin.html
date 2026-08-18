@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajanta Admin Portal | Executive Management Suite</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                        syne: ['Syne', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#00B8D9',
+                        primaryDark: '#008299',
+                        slateDark: '#020617',
+                        cardDark: '#0b1120',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #020617;
+            background-image: radial-gradient(circle at 15% 15%, rgba(0, 184, 217, 0.04) 0%, transparent 40%),
+                              radial-gradient(circle at 85% 85%, rgba(99, 102, 241, 0.04) 0%, transparent 40%);
+            min-height: 100vh;
+            color: #f1f5f9;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00B8D9; }
+    </style>
+</head>
+<body class="font-sans antialiased text-slate-100 selection:bg-cyan-500/20 selection:text-cyan-300">
+
+    <!-- ==========================================================================
+         1. SECURE ADMIN LOGIN SCREEN (SHOWN WHEN NOT AUTHENTICATED)
+         ========================================================================== -->
+    <div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl">
+        <div class="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+            <!-- Decorative gradient blur -->
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="text-center mb-8 relative">
+                <div class="w-16 h-16 bg-cyan-950/60 border border-cyan-500/30 rounded-2xl flex items-center justify-center mx-auto mb-4 text-cyan-400 text-2xl shadow-lg shadow-cyan-950/50">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <span class="text-[10px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950/50 border border-cyan-800/40 px-3 py-1 rounded-full">Private Admin System</span>
+                <h1 class="text-2xl font-syne font-black text-white mt-3">Ajanta Management</h1>
+                <p class="text-xs text-slate-400 mt-1">Authorized access to products, inquiries & catalog</p>
+            </div>
+
+            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4 relative">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Username / Admin ID</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="loginUsername" value="sunny" required placeholder="Enter username" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Password / Master PIN</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="loginPassword" value="ajanta76" required placeholder="Enter password or PIN" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <button type="button" onclick="toggleLoginPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs">
+                            <i id="loginPassIcon" class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="loginError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
+
+                <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2 cursor-pointer mt-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Unlock Admin Portal</span>
+                </button>
+
+                <div class="text-center pt-2">
+                    <a href="index.html" class="text-[11px] text-slate-500 hover:text-cyan-400 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-arrow-left text-[10px]"></i> Return to Public Website
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ==========================================================================
+         2. MAIN ADMIN DASHBOARD (SHOWN WHEN LOGGED IN)
+         ========================================================================== -->
+    <div id="dashboardApp" class="hidden min-h-screen flex flex-col">
+        
+        <!-- TOP NAVIGATION BAR -->
+        <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-40 px-4 sm:px-6 py-3.5">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                
+                <!-- Left: Branding & Status -->
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 rounded-xl flex items-center justify-center text-lg shadow">
+                        <i class="fa-solid fa-gem"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-syne font-black text-white text-base tracking-wide">Ajanta Admin Portal</h2>
+                            <span class="bg-emerald-950/60 border border-emerald-800/40 text-emerald-400 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Live
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Owner Management Console • Sunny Mehta</p>
+                    </div>
+                </div>
+
+                <!-- Right: Stats Badges & Actions -->
+                <div class="flex items-center flex-wrap gap-2 sm:gap-3">
+                    <!-- Quick Public Website Link -->
+                    <a href="index.html" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-cyan-400"></i>
+                        <span>View Website</span>
+                    </a>
+
+                    <!-- Cloud Sync -->
+                    <button onclick="syncAllCloudData()" id="syncDataBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer" title="Sync leads and data with cloud">
+                        <i class="fa-solid fa-arrows-rotate text-[10px] text-emerald-400"></i>
+                        <span>Sync</span>
+                    </button>
+
+                    <!-- Logout -->
+                    <button onclick="handleLogout()" class="bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/30 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+                        <i class="fa-solid fa-right-from-bracket text-[10px]"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN DASHBOARD CONTENT AREA -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+            <!-- SECTION TABS NAVIGATION -->
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-2 overflow-x-auto gap-4">
+                <nav class="flex space-x-2 shrink-0">
+                    <button onclick="switchTab('products')" id="tabNav-products" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-950/40 cursor-pointer">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                        <span>Products Catalog (<span id="badgeCountProducts">0</span>)</span>
+                    </button>
+
+                    <button onclick="switchTab('leads')" id="tabNav-leads" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                        <span>Inquiries & Quotes (<span id="badgeCountLeads">0</span>)</span>
+                    </button>
+
+                    <button onclick="switchTab('reviews')" id="tabNav-reviews" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
+                        <i class="fa-solid fa-star"></i>
+                        <span>Reviews (<span id="badgeCountReviews">0</span>)</span>
+                    </button>
+
+                    <button onclick="switchTab('settings')" id="tabNav-settings" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Backup & Settings</span>
+                    </button>
+                </nav>
+            </div>
+
+
+            <!-- ==================================================================
+                 TAB 1: PRODUCTS CATALOG MANAGEMENT
+                 ================================================================== -->
+            <div id="tabContent-products" class="tab-pane space-y-6">
+                <!-- Action Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 rounded-2xl">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>Dynamic Product Catalog</span>
+                            <span class="text-xs text-slate-400 font-normal">(Live on Public Website)</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Add, edit, reorder or remove architectural glass & window products</p>
+                    </div>
+
+                    <div class="flex items-center flex-wrap gap-2.5">
+                        <button onclick="openProductModal()" class="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-lg shadow-cyan-950/50 cursor-pointer">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Add New Product</span>
+                        </button>
+                        <button onclick="resetFactoryProducts()" class="bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-semibold px-3 py-2 rounded-xl transition cursor-pointer" title="Reset to standard 5 factory products">
+                            <i class="fa-solid fa-rotate-left"></i> Reset Defaults
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Product Search & Filter -->
+                <div class="flex items-center gap-3">
+                    <div class="relative flex-1 max-w-md">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" id="productSearchInput" oninput="filterProductsCatalog()" placeholder="Search products by title, category, or features..." class="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+                    </div>
+                </div>
+
+                <!-- Products Grid Container -->
+                <div id="adminProductsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <!-- Populated dynamically by admin.js -->
+                </div>
+            </div>
+
+
+            <!-- ==================================================================
+                 TAB 2: INQUIRIES & LEADS MANAGEMENT
+                 ================================================================== -->
+            <div id="tabContent-leads" class="tab-pane space-y-6 hidden">
+                <!-- Action Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 rounded-2xl">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <span>Client Quote Inquiries & Leads</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Review client specifications, contact via WhatsApp/phone, and export sheets</p>
+                    </div>
+
+                    <div class="flex items-center flex-wrap gap-2.5">
+                        <button onclick="exportLeadsExcel()" class="bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow">
+                            <i class="fa-solid fa-file-excel"></i> Export Excel (.xls)
+                        </button>
+                        <button onclick="exportLeadsCSV()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-700/60 transition cursor-pointer">
+                            <i class="fa-solid fa-file-csv"></i> CSV
+                        </button>
+                        <button onclick="clearAllLeadsPrompt()" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/30 text-xs font-semibold px-3 py-2 rounded-xl transition cursor-pointer">
+                            <i class="fa-solid fa-trash-can"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search & Filters -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="relative flex-1 max-w-md">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" id="leadSearchInput" oninput="filterLeadsList()" placeholder="Search by client name, phone number, location..." class="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="filterLeadStatus('ALL')" class="lead-status-btn text-xs px-3 py-1.5 rounded-lg bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-bold">All</button>
+                        <button onclick="filterLeadStatus('PENDING')" class="lead-status-btn text-xs px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 font-semibold hover:text-white">Pending</button>
+                        <button onclick="filterLeadStatus('CONTACTED')" class="lead-status-btn text-xs px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 font-semibold hover:text-white">Contacted</button>
+                    </div>
+                </div>
+
+                <!-- Leads List / Table -->
+                <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300 border-collapse">
+                            <thead>
+                                <tr class="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-bold">
+                                    <th class="p-3.5">Date</th>
+                                    <th class="p-3.5">Client Details</th>
+                                    <th class="p-3.5">Contact / Actions</th>
+                                    <th class="p-3.5">Location</th>
+                                    <th class="p-3.5">Items & Specs</th>
+                                    <th class="p-3.5">Status</th>
+                                    <th class="p-3.5 text-right">Delete</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminLeadsTableBody" class="divide-y divide-slate-800/60">
+                                <!-- Populated dynamically by admin.js -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noLeadsState" class="hidden text-center py-12 text-slate-500 space-y-2">
+                        <i class="fa-solid fa-inbox text-3xl opacity-40"></i>
+                        <p class="text-xs">No client inquiries found matching criteria.</p>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ==================================================================
+                 TAB 3: TESTIMONIALS & REVIEWS MODERATION
+                 ================================================================== -->
+            <div id="tabContent-reviews" class="tab-pane space-y-6 hidden">
+                <!-- Action Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 rounded-2xl">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Client Reviews & Testimonials</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Manage live feedback showcased on the public website</p>
+                    </div>
+
+                    <div class="flex items-center flex-wrap gap-2.5">
+                        <button onclick="openAddReviewModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer">
+                            <i class="fa-solid fa-plus"></i> Add Testimonial
+                        </button>
+                        <button onclick="resetDefaultReviews()" class="bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-semibold px-3 py-2 rounded-xl transition cursor-pointer">
+                            <i class="fa-solid fa-rotate-left"></i> Reset Defaults
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Reviews Grid -->
+                <div id="adminReviewsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Populated dynamically by admin.js -->
+                </div>
+            </div>
+
+
+            <!-- ==================================================================
+                 TAB 4: BACKUP, RESTORE & SYSTEM SETTINGS
+                 ================================================================== -->
+            <div id="tabContent-settings" class="tab-pane space-y-6 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- Backup & Restore Box -->
+                    <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 space-y-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-indigo-950/60 border border-indigo-800/40 text-indigo-400 rounded-xl flex items-center justify-center">
+                                <i class="fa-solid fa-cloud-arrow-down"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-white">Data Export & Backup</h4>
+                                <p class="text-[11px] text-slate-400">Save a complete snapshot of all products and leads</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <button onclick="downloadJsonBackup()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition cursor-pointer">
+                                <i class="fa-solid fa-download"></i> Download Full JSON Backup
+                            </button>
+
+                            <div class="pt-2 border-t border-slate-800/80">
+                                <label class="block text-xs font-bold text-slate-300 mb-1.5">Restore From Backup File</label>
+                                <input type="file" id="backupFileInput" accept=".json" onchange="restoreJsonBackup(event)" class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-cyan-400 hover:file:bg-slate-700 cursor-pointer">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Security Credentials -->
+                    <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 space-y-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-cyan-950/60 border border-cyan-800/40 text-cyan-400 rounded-xl flex items-center justify-center">
+                                <i class="fa-solid fa-key"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-white">Security & Password</h4>
+                                <p class="text-[11px] text-slate-400">Update admin portal username or master PIN</p>
+                            </div>
+                        </div>
+
+                        <form onsubmit="saveNewCredentials(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">Admin Username</label>
+                                <input type="text" id="settingUsername" value="sunny" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-300 mb-1">New Password / PIN</label>
+                                <input type="text" id="settingPassword" placeholder="Enter new password" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            </div>
+                            <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-bold py-2 px-4 rounded-xl transition cursor-pointer">
+                                Update Password
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- System Storage Overview -->
+                    <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 space-y-3 md:col-span-2">
+                        <h4 class="font-bold text-sm text-white flex items-center gap-2">
+                            <i class="fa-solid fa-server text-cyan-400"></i>
+                            <span>System Storage Status</span>
+                        </h4>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                            <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                                <div id="statBoxProducts" class="text-xl font-bold text-cyan-400">0</div>
+                                <div class="text-[10px] uppercase text-slate-400 mt-0.5">Active Products</div>
+                            </div>
+                            <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                                <div id="statBoxLeads" class="text-xl font-bold text-emerald-400">0</div>
+                                <div class="text-[10px] uppercase text-slate-400 mt-0.5">Saved Inquiries</div>
+                            </div>
+                            <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                                <div id="statBoxReviews" class="text-xl font-bold text-pink-400">0</div>
+                                <div class="text-[10px] uppercase text-slate-400 mt-0.5">Testimonials</div>
+                            </div>
+                            <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                                <div class="text-xs font-bold text-emerald-400 mt-1.5 flex items-center justify-center gap-1">
+                                    <span class="w-2 h-2 bg-emerald-400 rounded-full"></span> Ready
+                                </div>
+                                <div class="text-[10px] uppercase text-slate-400 mt-1">Storage State</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+
+    <!-- ==========================================================================
+         3. PRODUCT ADD / EDIT MODAL WITH LIVE PREVIEW
+         ========================================================================== -->
+    <div id="productModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md hidden overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/50">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-cyan-950 border border-cyan-800/40 text-cyan-400 flex items-center justify-center text-xs">
+                        <i class="fa-solid fa-cube"></i>
+                    </span>
+                    <div>
+                        <h3 id="productModalTitle" class="font-bold text-sm text-white">Add New Product</h3>
+                        <p class="text-[11px] text-slate-400">Configure specifications and publish to live website</p>
+                    </div>
+                </div>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-white text-lg transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Split Form & Live Preview) -->
+            <div class="flex-1 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left Form Inputs (7 cols) -->
+                <form id="productEditForm" onsubmit="saveProductForm(event)" class="lg:col-span-7 space-y-4">
+                    <input type="hidden" id="prodFormId">
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Product Title *</label>
+                        <input type="text" id="prodFormTitle" required oninput="updateLivePreview()" placeholder="e.g. Sliding Window Systems" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Subtitle / Short Note</label>
+                            <input type="text" id="prodFormSubtitle" oninput="updateLivePreview()" placeholder="e.g. Premium slim profiles" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-300 mb-1">Category Badge</label>
+                            <input type="text" id="prodFormBadge" oninput="updateLivePreview()" placeholder="e.g. Architectural Glazing" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Image URL</label>
+                        <input type="url" id="prodFormImage" oninput="updateLivePreview()" placeholder="https://images.unsplash.com/photo-..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        
+                        <!-- Quick Image Presets -->
+                        <div class="mt-2 space-y-1.5">
+                            <span class="text-[10px] text-slate-400 font-semibold block">Quick Preset Photos:</span>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🪟 Windows</button>
+                                <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🚪 Sliding Doors</button>
+                                <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🏢 Partitions</button>
+                                <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🚿 Showers</button>
+                                <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🛡️ Railings</button>
+                                <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">☀️ Skylights</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Description</label>
+                        <textarea id="prodFormDesc" rows="3" oninput="updateLivePreview()" placeholder="Detailed product description..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Key Features (Separate with commas)</label>
+                        <input type="text" id="prodFormFeatures" oninput="updateLivePreview()" placeholder="e.g. Noise Reduction, Weather Resistant, Custom Sizing" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+
+                    <div class="pt-3 flex items-center justify-end gap-3">
+                        <button type="button" onclick="closeProductModal()" class="px-4 py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-400 hover:text-white transition">Cancel</button>
+                        <button type="submit" class="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white text-xs font-bold px-6 py-2.5 rounded-xl transition shadow-lg shadow-cyan-950/50 cursor-pointer">
+                            <i class="fa-solid fa-check"></i> Save & Publish Product
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Right Live Preview Card (5 cols) -->
+                <div class="lg:col-span-5 flex flex-col">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-eye text-cyan-400"></i> Real-time Live Preview
+                    </span>
+                    <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex-1 flex flex-col justify-between space-y-4">
+                        <div class="space-y-3">
+                            <div class="relative h-44 rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
+                                <img id="previewImg" src="https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80" alt="Preview" class="w-full h-full object-cover">
+                                <span id="previewBadge" class="absolute top-2.5 left-2.5 bg-slate-950/80 backdrop-blur-md border border-cyan-500/40 text-cyan-300 text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase">Architectural Glazing</span>
+                            </div>
+
+                            <div>
+                                <h4 id="previewTitle" class="font-bold text-white text-sm">Sliding Window Systems</h4>
+                                <p id="previewSubtitle" class="text-[11px] text-slate-400">Premium slim profiles</p>
+                            </div>
+
+                            <p id="previewDesc" class="text-[11px] text-slate-300 line-clamp-3 leading-relaxed">
+                                Elegant sliding systems designed for modern homes and offices with smooth operation.
+                            </p>
+                        </div>
+
+                        <div>
+                            <span class="text-[9px] font-bold uppercase text-slate-500 block mb-1.5">Highlights:</span>
+                            <div id="previewFeatures" class="flex flex-wrap gap-1">
+                                <span class="bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 text-[9px] px-2 py-0.5 rounded-md">Noise Reduction</span>
+                                <span class="bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 text-[9px] px-2 py-0.5 rounded-md">Weather Resistant</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==========================================================================
+         4. ADD TESTIMONIAL MODAL
+         ========================================================================== -->
+    <div id="reviewAddModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-sm text-white">Add Client Testimonial</h3>
+                <button onclick="closeAddReviewModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form onsubmit="saveNewReview(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Client / Company Name *</label>
+                    <input type="text" id="revFormName" required placeholder="e.g. Rajesh Singhal" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Role / Project</label>
+                        <input type="text" id="revFormRole" placeholder="e.g. Architect, Bathinda" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Rating</label>
+                        <select id="revFormRating" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+                            <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Testimonial Text *</label>
+                    <textarea id="revFormText" required rows="3" placeholder="Client feedback..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-500"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold py-2.5 rounded-xl transition cursor-pointer">
+                    Save Testimonial
+                </button>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toastNotification" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 border border-cyan-500/50 text-white text-xs font-bold px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-cyan-400 text-base"></i>
+        <span id="toastMsg">Action completed successfully</span>
+    </div>
+
+    <!-- SCRIPT -->
+    <script src="admin.js"></script>
+</body>
+</html>
