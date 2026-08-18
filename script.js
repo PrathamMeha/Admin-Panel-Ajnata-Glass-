@@ -16,16 +16,7 @@ const STORAGE_KEYS = {
     SESSION: "ajanta_admin_logged_in"
 };
 
-const DEFAULT_USERS = [
-    {
-        id: "usr-sunny",
-        name: "Sunny Mehta",
-        mobile: "9215400355",
-        username: "sunny",
-        password: "ajantaDAWS1976",
-        createdAt: "2026-01-01T00:00:00.000Z"
-    }
-];
+const DEFAULT_USERS = [];
 
 const FACTORY_PRODUCTS = [
     {
@@ -238,16 +229,36 @@ function handleRegisterSubmit(e) {
 
     const users = getRegisteredUsers();
 
-    // 🔒 STRICT UNIQUE MOBILE NUMBER VALIDATION: 1 Mobile = 1 Account
-    const existingMobile = users.find(u => (u.mobile || "").replace(/[^0-9]/g, "") === cleanMobile);
-    if (existingMobile) {
-        showRegError(`Mobile number +91 ${cleanMobile} is already registered. Only 1 account is permitted per mobile number. Please Sign In.`);
+    // Check if mobile already exists in registered database
+    const existingMobIdx = users.findIndex(u => (u.mobile || "").replace(/[^0-9]/g, "") === cleanMobile);
+    if (existingMobIdx !== -1) {
+        const existing = users[existingMobIdx];
+        // If it was the initial placeholder/seed user, allow overwriting with newly chosen credentials
+        if (existing.id === "usr-sunny" || existing.createdAt === "2026-01-01T00:00:00.000Z") {
+            users[existingMobIdx] = {
+                id: `usr-${Date.now()}`,
+                name: name,
+                mobile: cleanMobile,
+                username: username,
+                password: password,
+                createdAt: new Date().toISOString()
+            };
+            saveRegisteredUsers(users);
+            sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+            sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(users[existingMobIdx]));
+            if (errBox) errBox.classList.add("hidden");
+            showToast(`Account registered! Welcome, ${name}`, "fa-user-check");
+            checkAuthSession();
+            return;
+        }
+
+        showRegError(`Mobile number +91 ${cleanMobile} is already registered. <button type="button" onclick="switchAuthMode('login')" class="underline font-bold text-cyan-300 ml-1">Sign In here</button>`);
         return;
     }
 
-    // STRICT UNIQUE USERNAME VALIDATION
+    // STRICT UNIQUE USERNAME VALIDATION (excluding if same user)
     const existingUser = users.find(u => (u.username || "").toLowerCase() === username.toLowerCase());
-    if (existingUser) {
+    if (existingUser && (existingUser.id !== "usr-sunny")) {
         showRegError(`Username '${username}' is already taken. Please choose another username.`);
         return;
     }
