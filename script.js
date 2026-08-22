@@ -95,8 +95,15 @@ let currentTab = "products";
 let activeLeadStatusFilter = "ALL";
 
 // ==========================================
-// 1. AUTHENTICATION & SESSION MANAGEMENT
 // ==========================================
+// 1. AUTHENTICATION, SERVER STORAGE & USER ISOLATION
+// ==========================================
+const CLOUD_SYNC_CONFIG = {
+    USERS_KEY: "ajanta_cloud_registered_users_v2",
+    LEADS_KEY: "sunny_ajanta_leads_key",
+    BASE_URL: "https://kvdb.io/T2p78Krq12XcfWn1vNiw9G/"
+};
+
 function getRegisteredUsers() {
     try {
         const stored = localStorage.getItem(STORAGE_KEYS.USERS);
@@ -113,9 +120,46 @@ function getRegisteredUsers() {
 function saveRegisteredUsers(users) {
     try {
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+        // Server & Cloud Sync (Spotify/Firebase style remote sync)
+        syncUsersToCloud(users);
     } catch (e) {
         console.warn("Failed to save users:", e);
     }
+}
+
+async function syncUsersToCloud(users) {
+    try {
+        const endpoint = `${CLOUD_SYNC_CONFIG.BASE_URL}${CLOUD_SYNC_CONFIG.USERS_KEY}`;
+        await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(users)
+        });
+    } catch (e) {
+        console.warn("Background user cloud sync:", e);
+    }
+}
+
+async function pullUsersFromCloud() {
+    try {
+        const endpoint = `${CLOUD_SYNC_CONFIG.BASE_URL}${CLOUD_SYNC_CONFIG.USERS_KEY}`;
+        const res = await fetch(endpoint).catch(() => null);
+        if (res && res.ok) {
+            const remoteUsers = await res.json().catch(() => null);
+            if (Array.isArray(remoteUsers) && remoteUsers.length > 0) {
+                const localUsers = getRegisteredUsers();
+                const mergedMap = new Map();
+                localUsers.forEach(u => mergedMap.set((u.mobile || u.username), u));
+                remoteUsers.forEach(u => mergedMap.set((u.mobile || u.username), u));
+                const merged = Array.from(mergedMap.values());
+                localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(merged));
+                return merged;
+            }
+        }
+    } catch (e) {
+        console.warn("Cloud user pull:", e);
+    }
+    return getRegisteredUsers();
 }
 
 function switchAuthMode(mode) {
@@ -285,7 +329,7 @@ function handleRegisterSubmit(e) {
     checkAuthSession();
 }
 
-function handleLoginSubmit(e) {
+async function handleLoginSubmit(e) {
     if (e) e.preventDefault();
     const identifier = document.getElementById("loginUsername")?.value?.trim() || "";
     const passIn = document.getElementById("loginPassword")?.value || "";
@@ -303,21 +347,31 @@ function handleLoginSubmit(e) {
         return;
     }
 
-    const users = getRegisteredUsers();
+    let users = getRegisteredUsers();
     const cleanId = identifier.replace(/[^0-9]/g, "");
 
-    // Check by username OR 10-digit mobile number
-    const matchedUser = users.find(u => {
+    // 1. Check local users
+    let matchedUser = users.find(u => {
         const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
         const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
         return (matchUser || matchMob) && u.password === passIn;
     });
 
+    // 2. If not found locally, try pulling latest users from server/cloud database
+    if (!matchedUser) {
+        users = await pullUsersFromCloud();
+        matchedUser = users.find(u => {
+            const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
+            const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
+            return (matchUser || matchMob) && u.password === passIn;
+        });
+    }
+
     if (matchedUser) {
         sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
         sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
         if (errBox) errBox.classList.add("hidden");
-        showToast(`Welcome ${matchedUser.name}! Admin session active`, "fa-circle-check");
+        showToast(`Welcome ${matchedUser.name}! Active session`, "fa-circle-check");
         checkAuthSession();
     } else {
         showLogErr("Invalid username/mobile number or password. If you are a new user, click Create Account.");
@@ -375,6 +429,27 @@ function initDashboard() {
     const mobileEl = document.getElementById("currentLoggedUserMobile");
     if (nameEl) nameEl.textContent = activeUser.name || "Administrator";
     if (mobileEl && activeUser.mobile) mobileEl.textContent = `(+91 ${activeUser.mobile})`;
+
+    // Personal User Profile Elements (Spotify-like individual account display)
+    const profName = document.getElementById("profileFullName");
+    const profMobile = document.getElementById("profileMobile");
+    const profUser = document.getElementById("profileUsername");
+    const profId = document.getElementById("profileUserId");
+    const profAvatar = document.getElementById("profileAvatarInitials");
+
+    if (profName) profName.textContent = activeUser.name || "Administrator";
+    if (profMobile) profMobile.textContent = activeUser.mobile || "—";
+    if (profUser) profUser.textContent = activeUser.username || "admin";
+    if (profId) profId.textContent = activeUser.id || ("usr-" + (activeUser.username || "active"));
+    if (profAvatar) {
+        const initials = (activeUser.name || "Admin")
+            .split(" ")
+            .map(n => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase();
+        profAvatar.textContent = initials || "A";
+    }
 
     // Settings inputs
     const setUsername = document.getElementById("settingUsername");
