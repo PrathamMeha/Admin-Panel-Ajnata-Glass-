@@ -519,12 +519,23 @@ function getStoredProducts() {
     } catch (e) {
         console.warn("Failed to parse products:", e);
     }
-    return FACTORY_PRODUCTS;
+    return [];
 }
 
-function saveProducts(productsList) {
+async function saveProducts(productsList) {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(productsList));
     updateBadgesAndStats();
+
+    // Sync to Cloud KVDB so Main website on any domain gets updated instantly
+    try {
+        await fetch("https://kvdb.io/T2p78Krq12XcfWn1vNiw9G/ajanta_products_catalog", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(productsList)
+        });
+    } catch (e) {
+        console.warn("Products cloud sync note:", e);
+    }
 }
 
 function renderProductsGrid(filterText = "") {
@@ -1092,12 +1103,23 @@ function getStoredReviews() {
     } catch (e) {
         console.warn("Reviews parse error:", e);
     }
-    return DEFAULT_REVIEWS;
+    return [];
 }
 
-function saveReviews(reviews) {
+async function saveReviews(reviews) {
     localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews));
     updateBadgesAndStats();
+
+    // Sync to Cloud KVDB so Main website on any domain gets updated instantly
+    try {
+        await fetch("https://kvdb.io/T2p78Krq12XcfWn1vNiw9G/ajanta_client_reviews", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(reviews)
+        });
+    } catch (e) {
+        console.warn("Reviews cloud sync note:", e);
+    }
 }
 
 function renderReviewsGrid() {
