@@ -538,12 +538,43 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-slate-300 mb-1">Image URL</label>
-                        <input type="url" id="prodFormImage" oninput="updateLivePreview()" placeholder="https://images.unsplash.com/photo-..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
-                        
-                        <!-- Quick Image Presets -->
-                        <div class="mt-2 space-y-1.5">
-                            <span class="text-[10px] text-slate-400 font-semibold block">Quick Preset Photos:</span>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-xs font-bold text-slate-300">Product Image</label>
+                            <!-- Tab switch: Upload vs URL vs Presets -->
+                            <div class="flex bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                                <button type="button" onclick="switchImgTab('upload')" id="imgTabUpload" class="px-2.5 py-1 rounded-md font-bold transition text-white bg-cyan-600">
+                                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Upload
+                                </button>
+                                <button type="button" onclick="switchImgTab('url')" id="imgTabUrl" class="px-2.5 py-1 rounded-md font-bold transition text-slate-400 hover:text-white">
+                                    <i class="fa-solid fa-link mr-1"></i> URL
+                                </button>
+                                <button type="button" onclick="switchImgTab('preset')" id="imgTabPreset" class="px-2.5 py-1 rounded-md font-bold transition text-slate-400 hover:text-white">
+                                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Presets
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 1. FILE UPLOAD DROPZONE -->
+                        <div id="imgUploadSection" class="space-y-2">
+                            <label for="prodFileInput" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 rounded-2xl bg-slate-950/60 hover:bg-slate-900/60 transition cursor-pointer group text-center">
+                                <div class="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mb-2 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                                </div>
+                                <span class="text-xs font-bold text-white block">Click to browse or drag photo here</span>
+                                <span class="text-[10px] text-slate-500 block mt-0.5">Supports PNG, JPG, WebP from phone/computer (Auto-optimized)</span>
+                                <input type="file" id="prodFileInput" accept="image/*" onchange="handleProductFileUpload(event)" class="hidden">
+                            </label>
+                        </div>
+
+                        <!-- 2. DIRECT URL INPUT -->
+                        <div id="imgUrlSection" class="hidden space-y-1.5">
+                            <input type="url" id="prodFormImage" oninput="updateLivePreview()" placeholder="https://images.unsplash.com/photo-..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <span class="text-[10px] text-slate-500 block">Paste direct image web address (Unsplash, CDN, etc.)</span>
+                        </div>
+
+                        <!-- 3. PRESETS -->
+                        <div id="imgPresetSection" class="hidden mt-2 space-y-1.5">
+                            <span class="text-[10px] text-slate-400 font-semibold block">Quick Architectural Photos:</span>
                             <div class="flex flex-wrap gap-1.5">
                                 <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🪟 Windows</button>
                                 <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🚪 Sliding Doors</button>
@@ -552,6 +583,17 @@
                                 <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">🛡️ Railings</button>
                                 <button type="button" onclick="setPresetImg('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80')" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg transition">☀️ Skylights</button>
                             </div>
+                        </div>
+
+                        <!-- Active Image Info Strip -->
+                        <div id="activeImgStrip" class="mt-2.5 flex items-center justify-between bg-slate-900/80 border border-slate-800/80 px-3 py-1.5 rounded-xl text-[11px]">
+                            <div class="flex items-center gap-2 truncate pr-2">
+                                <i class="fa-solid fa-image text-cyan-400 shrink-0"></i>
+                                <span id="activeImgName" class="text-slate-300 truncate">Preset / Current Image Selected</span>
+                            </div>
+                            <button type="button" onclick="clearSelectedImage()" class="text-rose-400 hover:text-rose-300 text-[10px] font-bold shrink-0">
+                                <i class="fa-solid fa-trash-can mr-1"></i> Clear
+                            </button>
                         </div>
                     </div>
 

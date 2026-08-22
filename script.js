@@ -628,13 +628,128 @@ function filterProductsCatalog() {
     renderProductsGrid(input ? input.value : "");
 }
 
+function switchImgTab(tab) {
+    const btnUpload = document.getElementById("imgTabUpload");
+    const btnUrl = document.getElementById("imgTabUrl");
+    const btnPreset = document.getElementById("imgTabPreset");
+
+    const secUpload = document.getElementById("imgUploadSection");
+    const secUrl = document.getElementById("imgUrlSection");
+    const secPreset = document.getElementById("imgPresetSection");
+
+    const activeClass = ["text-white", "bg-cyan-600"];
+    const inactiveClass = ["text-slate-400", "hover:text-white"];
+
+    // Reset buttons
+    [btnUpload, btnUrl, btnPreset].forEach(b => {
+        if (b) {
+            b.classList.remove(...activeClass);
+            b.classList.add(...inactiveClass);
+        }
+    });
+
+    // Reset sections
+    if (secUpload) secUpload.classList.add("hidden");
+    if (secUrl) secUrl.classList.add("hidden");
+    if (secPreset) secPreset.classList.add("hidden");
+
+    if (tab === "upload") {
+        if (btnUpload) { btnUpload.classList.add(...activeClass); btnUpload.classList.remove(...inactiveClass); }
+        if (secUpload) secUpload.classList.remove("hidden");
+    } else if (tab === "url") {
+        if (btnUrl) { btnUrl.classList.add(...activeClass); btnUrl.classList.remove(...inactiveClass); }
+        if (secUrl) secUrl.classList.remove("hidden");
+    } else if (tab === "preset") {
+        if (btnPreset) { btnPreset.classList.add(...activeClass); btnPreset.classList.remove(...inactiveClass); }
+        if (secPreset) secPreset.classList.remove("hidden");
+    }
+}
+
+// Compress and convert image to lightweight DataURL
+function compressImageFile(file, maxWidth = 1200, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Export as lightweight JPEG data URL
+                const dataUrl = canvas.toDataURL("image/jpeg", quality);
+                resolve(dataUrl);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function handleProductFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+        showToast("Please choose a valid image file", "fa-triangle-exclamation");
+        return;
+    }
+
+    showToast("Optimizing & uploading image...", "fa-spinner");
+
+    try {
+        const compressedBase64 = await compressImageFile(file);
+        const input = document.getElementById("prodFormImage");
+        if (input) input.value = compressedBase64;
+
+        const activeName = document.getElementById("activeImgName");
+        if (activeName) activeName.textContent = `Uploaded: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+
+        updateLivePreview();
+        showToast("Photo uploaded successfully!", "fa-circle-check");
+    } catch (err) {
+        console.error("Upload error:", err);
+        showToast("Failed to process image file", "fa-triangle-exclamation");
+    }
+}
+
+function clearSelectedImage() {
+    const input = document.getElementById("prodFormImage");
+    const fileInput = document.getElementById("prodFileInput");
+    if (input) input.value = "";
+    if (fileInput) fileInput.value = "";
+
+    const activeName = document.getElementById("activeImgName");
+    if (activeName) activeName.textContent = "No image selected (Default placeholder will be used)";
+
+    updateLivePreview();
+    showToast("Image cleared", "fa-trash-can");
+}
+
 function openProductModal(productId = null) {
     const modal = document.getElementById("productModal");
     const titleEl = document.getElementById("productModalTitle");
     const form = document.getElementById("productEditForm");
+    const activeName = document.getElementById("activeImgName");
+    const fileInput = document.getElementById("prodFileInput");
     if (!modal || !form) return;
 
     form.reset();
+    if (fileInput) fileInput.value = "";
+    switchImgTab("upload");
 
     if (productId) {
         const products = getStoredProducts();
@@ -648,12 +763,22 @@ function openProductModal(productId = null) {
             document.getElementById("prodFormImage").value = prod.image || "";
             document.getElementById("prodFormDesc").value = prod.description || "";
             document.getElementById("prodFormFeatures").value = (prod.features || []).join(", ");
+            if (activeName) {
+                if (prod.image && prod.image.startsWith("data:image")) {
+                    activeName.textContent = "Custom Uploaded Photo (Saved)";
+                } else if (prod.image) {
+                    activeName.textContent = "Current Web Photo Link";
+                } else {
+                    activeName.textContent = "No image selected";
+                }
+            }
         }
     } else {
         if (titleEl) titleEl.textContent = "Add New Product";
         document.getElementById("prodFormId").value = "";
         document.getElementById("prodFormImage").value = "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80";
         document.getElementById("prodFormBadge").value = "Architectural Glazing";
+        if (activeName) activeName.textContent = "Preset Architectural Window Photo";
     }
 
     updateLivePreview();
@@ -668,7 +793,10 @@ function closeProductModal() {
 function setPresetImg(url) {
     const input = document.getElementById("prodFormImage");
     if (input) input.value = url;
+    const activeName = document.getElementById("activeImgName");
+    if (activeName) activeName.textContent = "Preset Photo Selected";
     updateLivePreview();
+    showToast("Preset photo applied", "fa-wand-magic-sparkles");
 }
 
 function updateLivePreview() {
