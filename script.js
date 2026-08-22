@@ -404,7 +404,7 @@ function saveNewCredentials(e) {
     const newPass = document.getElementById("settingPassword")?.value?.trim();
 
     if (!newPass) {
-        alert("Please enter a new password");
+        showToast("Please enter a new password", "fa-triangle-exclamation");
         return;
     }
 
@@ -701,7 +701,7 @@ function saveProductForm(e) {
     const features = featuresRaw.split(",").map(s => s.trim()).filter(Boolean);
 
     if (!title) {
-        alert("Please enter a product title");
+        showToast("Please enter a product title", "fa-triangle-exclamation");
         return;
     }
 
@@ -734,17 +734,26 @@ function saveProductForm(e) {
     closeProductModal();
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
     let products = getStoredProducts();
     const prod = products.find(p => p.id === id);
     if (!prod) return;
 
-    if (!confirm(`Are you sure you want to delete product "${prod.title}"?`)) return;
+    const confirmed = await askConfirm({
+        title: "Delete Product",
+        message: `Are you sure you want to delete "${prod.title}" from your catalog?`,
+        confirmText: "Delete Product",
+        icon: "fa-trash-can",
+        isDanger: true
+    });
+    if (!confirmed) return;
 
     products = products.filter(p => p.id !== id);
     saveProducts(products);
-    renderProductsGrid();
-    showToast(`Product "${prod.title}" deleted`, "fa-trash-can");
+    requestAnimationFrame(() => {
+        renderProductsGrid();
+        showToast(`Product "${prod.title}" deleted`, "fa-trash-can");
+    });
 }
 
 function moveProduct(id, direction) {
@@ -759,14 +768,26 @@ function moveProduct(id, direction) {
     products.splice(targetIdx, 0, item);
 
     saveProducts(products);
-    renderProductsGrid();
+    requestAnimationFrame(() => {
+        renderProductsGrid();
+    });
 }
 
-function resetFactoryProducts() {
-    if (!confirm("Reset product catalog to standard factory defaults?")) return;
+async function resetFactoryProducts() {
+    const confirmed = await askConfirm({
+        title: "Restore Default Catalog",
+        message: "Reset product catalog to standard factory defaults? Any custom added items will be replaced.",
+        confirmText: "Restore Defaults",
+        icon: "fa-rotate-left",
+        isDanger: false
+    });
+    if (!confirmed) return;
+
     saveProducts(FACTORY_PRODUCTS);
-    renderProductsGrid();
-    showToast("Factory products catalog restored", "fa-rotate-left");
+    requestAnimationFrame(() => {
+        renderProductsGrid();
+        showToast("Factory products catalog restored", "fa-rotate-left");
+    });
 }
 
 
@@ -945,17 +966,36 @@ function updateLeadStatus(index, newStatus) {
     }
 }
 
-function deleteLead(index) {
+async function deleteLead(index) {
     let leads = getStoredLeads();
-    if (!confirm("Are you sure you want to delete this client inquiry?")) return;
+    const item = leads[index];
+    const name = item?.clientName ? `from "${item.clientName}"` : "";
+
+    const confirmed = await askConfirm({
+        title: "Delete Client Inquiry",
+        message: `Are you sure you want to remove this client inquiry ${name}?`,
+        confirmText: "Delete Inquiry",
+        icon: "fa-trash-can",
+        isDanger: true
+    });
+    if (!confirmed) return;
+
     leads.splice(index, 1);
     saveLeads(leads);
     renderLeadsTable();
     showToast("Inquiry removed", "fa-trash-can");
 }
 
-function clearAllLeadsPrompt() {
-    if (!confirm("Are you sure you want to clear ALL inquiries? This cannot be undone.")) return;
+async function clearAllLeadsPrompt() {
+    const confirmed = await askConfirm({
+        title: "Clear All Inquiries",
+        message: "Are you sure you want to permanently clear ALL customer inquiries? This cannot be undone.",
+        confirmText: "Clear All",
+        icon: "fa-triangle-exclamation",
+        isDanger: true
+    });
+    if (!confirmed) return;
+
     saveLeads([]);
     renderLeadsTable();
     showToast("All inquiries cleared", "fa-trash-can");
@@ -964,7 +1004,7 @@ function clearAllLeadsPrompt() {
 function exportLeadsExcel() {
     const leads = getStoredLeads();
     if (leads.length === 0) {
-        alert("No inquiries to export.");
+        showToast("No inquiries available to export", "fa-circle-info");
         return;
     }
 
@@ -1011,7 +1051,7 @@ function exportLeadsExcel() {
 function exportLeadsCSV() {
     const leads = getStoredLeads();
     if (leads.length === 0) {
-        alert("No inquiries to export.");
+        showToast("No inquiries to export", "fa-circle-info");
         return;
     }
 
@@ -1109,7 +1149,7 @@ function saveNewReview(e) {
     const text = document.getElementById("revFormText")?.value?.trim();
 
     if (!name || !text) {
-        alert("Please enter both client name and review text");
+        showToast("Please enter both client name and review text", "fa-triangle-exclamation");
         return;
     }
 
@@ -1121,17 +1161,36 @@ function saveNewReview(e) {
     showToast("Testimonial added to public website", "fa-star");
 }
 
-function deleteReview(index) {
+async function deleteReview(index) {
     let reviews = getStoredReviews();
-    if (!confirm("Are you sure you want to remove this client review?")) return;
+    const item = reviews[index];
+    const client = item?.name ? `from "${item.name}"` : "";
+
+    const confirmed = await askConfirm({
+        title: "Delete Testimonial",
+        message: `Are you sure you want to remove this client review ${client}?`,
+        confirmText: "Delete Review",
+        icon: "fa-trash-can",
+        isDanger: true
+    });
+    if (!confirmed) return;
+
     reviews.splice(index, 1);
     saveReviews(reviews);
     renderReviewsGrid();
     showToast("Review deleted", "fa-trash-can");
 }
 
-function resetDefaultReviews() {
-    if (!confirm("Reset testimonials to defaults?")) return;
+async function resetDefaultReviews() {
+    const confirmed = await askConfirm({
+        title: "Reset Testimonials",
+        message: "Reset client testimonials to default showcase entries?",
+        confirmText: "Reset Reviews",
+        icon: "fa-rotate-left",
+        isDanger: false
+    });
+    if (!confirmed) return;
+
     saveReviews(DEFAULT_REVIEWS);
     renderReviewsGrid();
     showToast("Default testimonials restored", "fa-rotate-left");
@@ -1163,9 +1222,21 @@ function downloadJsonBackup() {
     showToast("Full backup downloaded (.json)", "fa-download");
 }
 
-function restoreJsonBackup(event) {
+async function restoreJsonBackup(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const confirmed = await askConfirm({
+        title: "Restore Backup Database",
+        message: `Restore database from "${file.name}"? Current records will be replaced.`,
+        confirmText: "Restore Database",
+        icon: "fa-file-import",
+        isDanger: false
+    });
+    if (!confirmed) {
+        event.target.value = "";
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = function(e) {
@@ -1183,7 +1254,9 @@ function restoreJsonBackup(event) {
             initDashboard();
             showToast("Database restored successfully!", "fa-circle-check");
         } catch (err) {
-            alert("Invalid backup file: " + err.message);
+            showToast("Invalid backup file: " + err.message, "fa-triangle-exclamation");
+        } finally {
+            event.target.value = "";
         }
     };
     reader.readAsText(file);
@@ -1223,8 +1296,57 @@ async function syncAllCloudData() {
 
 
 // ==========================================
-// 7. UTILITIES
+// 7. UTILITIES & ASYNC CONFIRM (Non-blocking INP)
 // ==========================================
+function askConfirm({ title = "Confirm Action", message = "Are you sure you want to proceed?", confirmText = "Confirm", icon = "fa-trash-can", isDanger = true } = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById("customConfirmModal");
+        const titleEl = document.getElementById("confirmTitle");
+        const descEl = document.getElementById("confirmDesc");
+        const actBtn = document.getElementById("confirmActionBtn");
+        const actText = document.getElementById("confirmActionText");
+        const cancelBtn = document.getElementById("confirmCancelBtn");
+        const iconEl = document.getElementById("confirmIcon");
+        const iconBox = document.getElementById("confirmIconBox");
+
+        if (!modal || !actBtn || !cancelBtn) {
+            resolve(true);
+            return;
+        }
+
+        if (titleEl) titleEl.textContent = title;
+        if (descEl) descEl.textContent = message;
+        if (actText) actText.textContent = confirmText;
+        if (iconEl) iconEl.className = `fa-solid ${icon}`;
+
+        if (isDanger) {
+            actBtn.className = "bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-rose-600/30 cursor-pointer flex items-center gap-1.5";
+            if (iconBox) iconBox.className = "w-12 h-12 rounded-2xl bg-rose-950/60 border border-rose-500/30 text-rose-400 flex items-center justify-center text-xl flex-shrink-0";
+        } else {
+            actBtn.className = "bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-lg shadow-cyan-600/30 cursor-pointer flex items-center gap-1.5";
+            if (iconBox) iconBox.className = "w-12 h-12 rounded-2xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-xl flex-shrink-0";
+        }
+
+        const onConfirm = () => {
+            modal.classList.add("hidden");
+            actBtn.removeEventListener("click", onConfirm);
+            cancelBtn.removeEventListener("click", onCancel);
+            resolve(true);
+        };
+
+        const onCancel = () => {
+            modal.classList.add("hidden");
+            actBtn.removeEventListener("click", onConfirm);
+            cancelBtn.removeEventListener("click", onCancel);
+            resolve(false);
+        };
+
+        actBtn.addEventListener("click", onConfirm, { once: true });
+        cancelBtn.addEventListener("click", onCancel, { once: true });
+        modal.classList.remove("hidden");
+    });
+}
+
 function showToast(msg, iconClass = "fa-circle-check") {
     const toast = document.getElementById("toastNotification");
     const msgEl = document.getElementById("toastMsg");
@@ -1237,7 +1359,8 @@ function showToast(msg, iconClass = "fa-circle-check") {
     toast.classList.remove("translate-y-20", "opacity-0");
     toast.classList.add("translate-y-0", "opacity-100");
 
-    setTimeout(() => {
+    if (toast.hideTimeout) clearTimeout(toast.hideTimeout);
+    toast.hideTimeout = setTimeout(() => {
         toast.classList.add("translate-y-20", "opacity-0");
         toast.classList.remove("translate-y-0", "opacity-100");
     }, 3200);
