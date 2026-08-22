@@ -512,9 +512,9 @@ function updateBadgesAndStats() {
 function getStoredProducts() {
     try {
         const stored = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-        if (stored) {
+        if (stored !== null) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed)) return parsed;
         }
     } catch (e) {
         console.warn("Failed to parse products:", e);
@@ -1085,9 +1085,9 @@ function exportLeadsCSV() {
 function getStoredReviews() {
     try {
         const stored = localStorage.getItem(STORAGE_KEYS.REVIEWS);
-        if (stored) {
+        if (stored !== null) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed)) return parsed;
         }
     } catch (e) {
         console.warn("Reviews parse error:", e);
@@ -1105,6 +1105,16 @@ function renderReviewsGrid() {
     if (!container) return;
 
     const reviews = getStoredReviews();
+
+    if (reviews.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full py-12 text-center text-slate-500 space-y-2 bg-slate-900/40 rounded-2xl border border-slate-800">
+                <i class="fa-solid fa-comment-slash text-3xl opacity-40"></i>
+                <p class="text-xs">No client reviews found. Click "+ Add Testimonial" to add a new verified review.</p>
+            </div>
+        `;
+        return;
+    }
 
     container.innerHTML = reviews.map((rev, idx) => `
         <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between space-y-3 shadow">
