@@ -514,12 +514,12 @@ function getStoredProducts() {
         const stored = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
         if (stored !== null) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) return parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
     } catch (e) {
         console.warn("Failed to parse products:", e);
     }
-    return [];
+    return FACTORY_PRODUCTS;
 }
 
 async function saveProducts(productsList) {
@@ -1049,10 +1049,21 @@ function renderLeadsTable(searchQuery = "") {
 
                 <!-- Items & Specs -->
                 <td class="p-3.5 text-xs text-slate-300">
-                    <span class="inline-flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-[10px] font-mono text-cyan-300">
-                        <i class="fa-solid fa-layer-group text-[9px]"></i>
-                        ${lead.items && lead.items.length ? `${lead.items.length} items` : 'Custom Scope'}
-                    </span>
+                    ${lead.items && lead.items.length ? `
+                        <div class="space-y-1">
+                            <span class="inline-flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-[10px] font-mono text-cyan-300 font-bold">
+                                <i class="fa-solid fa-layer-group text-[9px]"></i>
+                                ${lead.items.length} ${lead.items.length === 1 ? 'Spec' : 'Specs'}
+                            </span>
+                            <div class="text-[10px] text-slate-400 max-w-[220px] line-clamp-2 leading-relaxed">
+                                ${lead.items.map(it => `${escapeHtml(it.name || 'Glass')} (${escapeHtml(it.thickness || 'Std')}/${escapeHtml(it.edgework || 'None')}) ${it.width}"×${it.height}" [${it.qty}]`).join("; ")}
+                            </div>
+                        </div>
+                    ` : `
+                        <span class="inline-flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 text-[10px] font-mono text-slate-400">
+                            Custom Scope
+                        </span>
+                    `}
                 </td>
 
                 <!-- Status Selector -->
@@ -1156,18 +1167,24 @@ function exportLeadsExcel() {
         <Cell><Data ss:Type="String">Client Name</Data></Cell>
         <Cell><Data ss:Type="String">Phone Number</Data></Cell>
         <Cell><Data ss:Type="String">Address / Site Location</Data></Cell>
+        <Cell><Data ss:Type="String">Sizing Specifications (Material, Thickness, Edgework, Dimensions, Qty)</Data></Cell>
         <Cell><Data ss:Type="String">Requirements Notes</Data></Cell>
         <Cell><Data ss:Type="String">Status</Data></Cell>
     </Row>`;
 
     leads.forEach(l => {
         const dateStr = l.createdAt ? new Date(l.createdAt).toLocaleDateString("en-IN") : "Recent";
+        const itemsStr = (l.items && l.items.length) 
+            ? l.items.map(it => `${it.name || 'Glass'} [Thick: ${it.thickness || 'Std'}, Edge: ${it.edgework || 'None'}, Size: ${it.width}"x${it.height}", Qty: ${it.qty}]`).join(" | ")
+            : "Custom Scope";
+
         excelContent += `
         <Row>
             <Cell><Data ss:Type="String">${escapeXml(dateStr)}</Data></Cell>
             <Cell><Data ss:Type="String">${escapeXml(l.clientName || '')}</Data></Cell>
             <Cell><Data ss:Type="String">${escapeXml(l.clientPhone || '')}</Data></Cell>
             <Cell><Data ss:Type="String">${escapeXml(l.clientAddress || '')}</Data></Cell>
+            <Cell><Data ss:Type="String">${escapeXml(itemsStr)}</Data></Cell>
             <Cell><Data ss:Type="String">${escapeXml(l.requirements || '')}</Data></Cell>
             <Cell><Data ss:Type="String">${escapeXml(l.status || 'PENDING')}</Data></Cell>
         </Row>`;
@@ -1194,15 +1211,22 @@ function exportLeadsCSV() {
         return;
     }
 
-    const headers = ["Date", "Client Name", "Phone", "Location", "Notes", "Status"];
-    const rows = leads.map(l => [
-        `"${(l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '').replace(/"/g, '""')}"`,
-        `"${(l.clientName || '').replace(/"/g, '""')}"`,
-        `"${(l.clientPhone || '').replace(/"/g, '""')}"`,
-        `"${(l.clientAddress || '').replace(/"/g, '""')}"`,
-        `"${(l.requirements || '').replace(/"/g, '""')}"`,
-        `"${(l.status || 'PENDING').replace(/"/g, '""')}"`
-    ]);
+    const headers = ["Date", "Client Name", "Phone", "Location", "Sizing Specifications", "Notes", "Status"];
+    const rows = leads.map(l => {
+        const itemsStr = (l.items && l.items.length) 
+            ? l.items.map(it => `${it.name || 'Glass'} [Thick: ${it.thickness || 'Std'}, Edge: ${it.edgework || 'None'}, Size: ${it.width}"x${it.height}", Qty: ${it.qty}]`).join(" | ")
+            : "Custom Scope";
+
+        return [
+            `"${(l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '').replace(/"/g, '""')}"`,
+            `"${(l.clientName || '').replace(/"/g, '""')}"`,
+            `"${(l.clientPhone || '').replace(/"/g, '""')}"`,
+            `"${(l.clientAddress || '').replace(/"/g, '""')}"`,
+            `"${itemsStr.replace(/"/g, '""')}"`,
+            `"${(l.requirements || '').replace(/"/g, '""')}"`,
+            `"${(l.status || 'PENDING').replace(/"/g, '""')}"`
+        ];
+    });
 
     const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
