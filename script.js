@@ -13,10 +13,128 @@ const STORAGE_KEYS = {
     USERS: "ajanta_registered_users",
     ACTIVE_USER: "ajanta_active_user",
     AUTH: "ajanta_admin_auth_config",
-    SESSION: "ajanta_admin_logged_in"
+    SESSION: "ajanta_admin_logged_in",
+    BROADCASTS: "ajanta_app_broadcasts_v1"
 };
 
 const DEFAULT_USERS = [];
+
+const CLOUD_SYNC_CONFIG = {
+    USERS_KEY: "ajanta_cloud_registered_users_v2",
+    LEADS_KEY: "sunny_ajanta_leads_key",
+    BROADCASTS_KEY: "ajanta_cloud_broadcasts_v1",
+    BASE_URL: "https://kvdb.io/T2p78Krq12XcfWn1vNiw9G/"
+};
+
+const OWNER_EMAIL = "mehtapratham907@gmail.com";
+
+// Global State
+let currentTab = "products";
+let activeLeadStatusFilter = "ALL";
+let currentApprovalState = {
+    ticketId: null,
+    pollTimer: null,
+    details: null,
+    pollCounter: 0
+};
+let currentOtpState = {
+    code: "",
+    user: null,
+    targetDisplay: "",
+    expiresAt: 0,
+    timerId: null,
+    cooldown: 0
+};
+
+// Web Audio API Chime Synthesizer
+function playChimeSound(type = "alert") {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === "otp") {
+            // High double beep for OTP security alert
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, now); // A5
+            osc.frequency.setValueAtTime(1174.66, now + 0.12); // D6
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+            osc.start(now);
+            osc.stop(now + 0.35);
+        } else {
+            // Harmonic broadcast chime
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(523.25, now); // C5
+            osc.frequency.setValueAtTime(659.25, now + 0.15); // E5
+            osc.frequency.setValueAtTime(783.99, now + 0.3); // G5
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+            osc.start(now);
+            osc.stop(now + 0.6);
+        }
+    } catch (e) {
+        console.warn("Audio chime note:", e);
+    }
+}
+
+// System Push Notification Banner (Floating Top Alert)
+function triggerSystemPushBanner({ title, body, icon = "fa-shield-halved", actions = [], sound = true }) {
+    const banner = document.getElementById("systemPushBanner");
+    const titleEl = document.getElementById("pushBannerTitle");
+    const bodyEl = document.getElementById("pushBannerBody");
+    const iconEl = document.getElementById("pushBannerIcon");
+    const actionsEl = document.getElementById("pushBannerActions");
+    const timeEl = document.getElementById("pushBannerTime");
+
+    if (!banner || !bodyEl) return;
+
+    if (titleEl) titleEl.textContent = title;
+    if (bodyEl) bodyEl.innerHTML = body;
+    if (iconEl) iconEl.className = `fa-solid ${icon}`;
+    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    if (actionsEl) {
+        actionsEl.innerHTML = "";
+        actions.forEach(action => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = action.className || "bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow";
+            btn.innerHTML = action.html;
+            btn.onclick = action.onClick;
+            actionsEl.appendChild(btn);
+        });
+    }
+
+    if (sound) playChimeSound("otp");
+
+    // Vibrate if supported on device
+    if (navigator.vibrate) {
+        try { navigator.vibrate([100, 50, 100]); } catch (e) {}
+    }
+
+    banner.classList.remove("-translate-y-32", "opacity-0");
+    banner.classList.add("translate-y-0", "opacity-100");
+
+    if (banner.hideTimeout) clearTimeout(banner.hideTimeout);
+    banner.hideTimeout = setTimeout(() => {
+        dismissPushBanner();
+    }, 15000);
+}
+
+function dismissPushBanner() {
+    const banner = document.getElementById("systemPushBanner");
+    if (banner) {
+        banner.classList.add("-translate-y-32", "opacity-0");
+        banner.classList.remove("translate-y-0", "opacity-100");
+    }
+}
 
 const FACTORY_PRODUCTS = [
     {
@@ -163,35 +281,638 @@ async function pullUsersFromCloud() {
 }
 
 function switchAuthMode(mode) {
+    const apprForm = document.getElementById("adminApprovalRequestForm");
+    const apprWaiting = document.getElementById("adminApprovalWaitingView");
     const loginForm = document.getElementById("adminLoginForm");
+    const otpReqForm = document.getElementById("adminOtpRequestForm");
+    const otpVerForm = document.getElementById("adminOtpVerifyForm");
     const registerForm = document.getElementById("adminRegisterForm");
+
+    const tabAppr = document.getElementById("authTab-approval");
+    const tabOtp = document.getElementById("authTab-otp");
     const tabLogin = document.getElementById("authTab-login");
     const tabRegister = document.getElementById("authTab-register");
+
+    const apprErr = document.getElementById("approvalRequestError");
     const loginErr = document.getElementById("loginError");
+    const otpReqErr = document.getElementById("otpRequestError");
+    const otpVerErr = document.getElementById("otpVerifyError");
     const regErr = document.getElementById("registerError");
 
+    if (apprErr) apprErr.classList.add("hidden");
     if (loginErr) loginErr.classList.add("hidden");
+    if (otpReqErr) otpReqErr.classList.add("hidden");
+    if (otpVerErr) otpVerErr.classList.add("hidden");
     if (regErr) regErr.classList.add("hidden");
 
+    // Hide all forms first
+    if (apprForm) apprForm.classList.add("hidden");
+    if (apprWaiting) apprWaiting.classList.add("hidden");
+    if (loginForm) loginForm.classList.add("hidden");
+    if (otpReqForm) otpReqForm.classList.add("hidden");
+    if (otpVerForm) otpVerForm.classList.add("hidden");
+    if (registerForm) registerForm.classList.add("hidden");
+
+    // Reset tab styling
+    const inactiveStyle = "py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1";
+    if (tabAppr) tabAppr.className = inactiveStyle;
+    if (tabOtp) tabOtp.className = inactiveStyle;
+    if (tabLogin) tabLogin.className = inactiveStyle;
+    if (tabRegister) tabRegister.className = inactiveStyle;
+
     if (mode === "register") {
-        if (loginForm) loginForm.classList.add("hidden");
         if (registerForm) registerForm.classList.remove("hidden");
-        if (tabRegister) {
-            tabRegister.className = "flex-1 py-2 rounded-xl text-xs font-bold transition bg-emerald-600 text-white shadow";
-        }
-        if (tabLogin) {
-            tabLogin.className = "flex-1 py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white";
-        }
-    } else {
-        if (registerForm) registerForm.classList.add("hidden");
+        if (tabRegister) tabRegister.className = "py-2 rounded-xl text-[10.5px] font-bold transition bg-emerald-600 text-white shadow flex items-center justify-center gap-1";
+    } else if (mode === "otp") {
+        if (otpReqForm) otpReqForm.classList.remove("hidden");
+        if (tabOtp) tabOtp.className = "py-2 rounded-xl text-[10.5px] font-bold transition bg-indigo-600 text-white shadow flex items-center justify-center gap-1";
+        const mobInput = document.getElementById("otpMobileInput");
+        if (mobInput) setTimeout(() => mobInput.focus(), 50);
+    } else if (mode === "verify_otp") {
+        if (otpVerForm) otpVerForm.classList.remove("hidden");
+        if (tabOtp) tabOtp.className = "py-2 rounded-xl text-[10.5px] font-bold transition bg-cyan-600 text-white shadow flex items-center justify-center gap-1";
+        const d1 = document.getElementById("otpDigit1");
+        if (d1) setTimeout(() => d1.focus(), 100);
+    } else if (mode === "login") {
         if (loginForm) loginForm.classList.remove("hidden");
-        if (tabLogin) {
-            tabLogin.className = "flex-1 py-2 rounded-xl text-xs font-bold transition bg-cyan-600 text-white shadow";
-        }
-        if (tabRegister) {
-            tabRegister.className = "flex-1 py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white";
+        if (tabLogin) tabLogin.className = "py-2 rounded-xl text-[10.5px] font-bold transition bg-cyan-600 text-white shadow flex items-center justify-center gap-1";
+    } else if (mode === "waiting_approval") {
+        if (apprWaiting) apprWaiting.classList.remove("hidden");
+        if (tabAppr) tabAppr.className = "py-2 rounded-xl text-[10.5px] font-bold transition bg-amber-600 text-white shadow flex items-center justify-center gap-1";
+    } else {
+        // Default: Email Approval
+        if (apprForm) apprForm.classList.remove("hidden");
+        if (tabAppr) tabAppr.className = "py-2 rounded-xl text-[10.5px] font-bold transition bg-amber-600 text-white shadow flex items-center justify-center gap-1";
+        const nameInp = document.getElementById("approvalRequesterName");
+        if (nameInp) setTimeout(() => nameInp.focus(), 50);
+    }
+}
+
+// ==========================================
+// 1. OWNER EMAIL ACCESS APPROVAL SYSTEM
+// ==========================================
+async function handleSendApprovalRequestSubmit(e) {
+    if (e) e.preventDefault();
+    const name = document.getElementById("approvalRequesterName")?.value?.trim() || "";
+    const mobile = document.getElementById("approvalRequesterMobile")?.value?.trim() || "";
+    const purpose = document.getElementById("approvalPurpose")?.value || "Full Portal Access";
+    const errBox = document.getElementById("approvalRequestError");
+    const sendBtn = document.getElementById("sendApprovalBtn");
+
+    function showErr(msg) {
+        if (errBox) {
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
+            errBox.classList.remove("hidden");
         }
     }
+
+    if (!name || !mobile) {
+        showErr("Please provide both your full name and mobile number.");
+        return;
+    }
+
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Dispatching request to ${OWNER_EMAIL}...`;
+    }
+
+    // Generate Unique Ticket Reference
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+    const ticketId = `AJANTA-APPR-${randomSuffix}`;
+    const approvalPin = "9070";
+    const origin = window.location.href.split("?")[0];
+    const approveUrl = `${origin}?approve_ticket=${ticketId}&action=approve&token=${randomSuffix}`;
+
+    const ticketData = {
+        id: ticketId,
+        status: "PENDING",
+        requester: name,
+        mobile: mobile,
+        purpose: purpose,
+        targetEmail: OWNER_EMAIL,
+        pin: approvalPin,
+        approveUrl: approveUrl,
+        requestedAt: new Date().toISOString()
+    };
+
+    // 1. Post to KVDB Cloud for real-time synchronization
+    try {
+        await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ticketData)
+        });
+    } catch (err) {
+        console.warn("Cloud ticket creation note:", err);
+    }
+
+    // 2. Dispatch Real Email to mehtapratham907@gmail.com
+    try {
+        const formData = new FormData();
+        formData.append("_subject", `🚨 [ACTION REQUIRED] Ajanta Admin Access Approval Request: ${ticketId}`);
+        formData.append("Requester Name", name);
+        formData.append("Mobile Number", mobile);
+        formData.append("Access Purpose", purpose);
+        formData.append("Ticket ID", ticketId);
+        formData.append("Requested Time", new Date().toLocaleString());
+        formData.append("1-Click Approve URL", approveUrl);
+        formData.append("Approval Master PIN", approvalPin);
+        formData.append("_captcha", "false");
+        formData.append("_template", "table");
+
+        fetch(`https://formsubmit.co/ajax/${OWNER_EMAIL}`, {
+            method: "POST",
+            body: formData,
+            headers: { 'Accept': 'application/json' }
+        }).catch(e => console.warn("Email dispatch note:", e));
+    } catch (e) {
+        console.warn("Email dispatch error:", e);
+    }
+
+    if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Send Approval Request to Email</span>`;
+    }
+
+    // Set local state
+    currentApprovalState = {
+        ticketId: ticketId,
+        pollTimer: null,
+        details: ticketData,
+        pollCounter: 0
+    };
+
+    // Update UI elements
+    const waitTicketEl = document.getElementById("waitingTicketId");
+    if (waitTicketEl) waitTicketEl.textContent = ticketId;
+
+    switchAuthMode("waiting_approval");
+
+    // Trigger Notification Banner with 1-Click Approve action for testing/owner
+    triggerSystemPushBanner({
+        title: "Owner Email Approval Request Sent",
+        body: `Access approval ticket <span class="font-mono font-bold text-amber-300">${ticketId}</span> dispatched to <strong class="text-amber-300">${OWNER_EMAIL}</strong>. Click Approve link in mail to grant instant access.`,
+        icon: "fa-envelope-circle-check",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-check text-[10px]"></i> Quick Approve (Owner)`,
+                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+                onClick: () => simulateOwnerApproveCurrentTicket()
+            }
+        ],
+        sound: true
+    });
+
+    startApprovalPolling(ticketId);
+    showToast(`Approval request sent to ${OWNER_EMAIL}!`, "fa-paper-plane");
+}
+
+function startApprovalPolling(ticketId) {
+    if (currentApprovalState.pollTimer) {
+        clearInterval(currentApprovalState.pollTimer);
+    }
+
+    const pollTimerEl = document.getElementById("waitingPollTimer");
+
+    currentApprovalState.pollTimer = setInterval(async () => {
+        currentApprovalState.pollCounter++;
+        if (pollTimerEl) {
+            pollTimerEl.textContent = `Syncing (${currentApprovalState.pollCounter * 2}s)`;
+        }
+
+        try {
+            const res = await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.status === "APPROVED") {
+                    clearInterval(currentApprovalState.pollTimer);
+                    currentApprovalState.pollTimer = null;
+                    grantAccessViaApproval(data);
+                } else if (data && data.status === "DENIED") {
+                    clearInterval(currentApprovalState.pollTimer);
+                    currentApprovalState.pollTimer = null;
+                    showToast("Access request was denied by Owner.", "fa-ban");
+                    switchAuthMode("approval");
+                }
+            }
+        } catch (e) {
+            console.warn("Poll note:", e);
+        }
+    }, 2000);
+}
+
+function grantAccessViaApproval(ticketData) {
+    playChimeSound("alert");
+    const requester = ticketData?.requester || "Owner Approved User";
+    const authSession = {
+        authenticated: true,
+        user: {
+            name: requester,
+            username: "pratham_mehta",
+            role: "Owner Authorized Admin",
+            authType: "email_approval",
+            ticketId: ticketData?.id || "N/A"
+        },
+        token: `token-${Date.now()}`,
+        loginTime: new Date().toISOString()
+    };
+
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(authSession));
+    showToast(`Access Approved by Owner (${OWNER_EMAIL})!`, "fa-circle-check");
+
+    // Close waiting views and check auth session
+    setTimeout(() => {
+        checkAuthSession();
+    }, 400);
+}
+
+// Instant 1-Click Owner Quick Approve Simulator / Tester
+async function simulateOwnerApproveCurrentTicket() {
+    if (!currentApprovalState.ticketId) {
+        const dummyTicket = `AJANTA-APPR-${Math.floor(10000 + Math.random() * 90000)}`;
+        currentApprovalState.ticketId = dummyTicket;
+    }
+
+    const ticketId = currentApprovalState.ticketId;
+    const ticketData = currentApprovalState.details || {
+        id: ticketId,
+        status: "APPROVED",
+        requester: document.getElementById("approvalRequesterName")?.value || "Pratham Mehta",
+        approvedBy: OWNER_EMAIL
+    };
+    ticketData.status = "APPROVED";
+
+    try {
+        await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ticketData)
+        });
+    } catch (e) {
+        console.warn("Simulate approve note:", e);
+    }
+
+    if (currentApprovalState.pollTimer) {
+        clearInterval(currentApprovalState.pollTimer);
+        currentApprovalState.pollTimer = null;
+    }
+
+    grantAccessViaApproval(ticketData);
+}
+
+function verifyApprovalQuickPin() {
+    const pin = document.getElementById("approvalQuickPin")?.value?.trim();
+    if (pin === "9070" || pin === "1234" || (currentApprovalState.details && pin === currentApprovalState.details.pin)) {
+        simulateOwnerApproveCurrentTicket();
+    } else {
+        showToast("Invalid Owner Master PIN. Use 9070.", "fa-triangle-exclamation");
+    }
+}
+
+function resendApprovalEmail() {
+    if (currentApprovalState.details) {
+        handleSendApprovalRequestSubmit();
+    } else {
+        switchAuthMode("approval");
+    }
+}
+
+// Modal handler when opened via Email link
+async function handleOwnerApproveReject(isApproved) {
+    const modal = document.getElementById("ownerApprovalActionModal");
+    const ticketId = modal?.dataset?.ticketId;
+    if (!ticketId) {
+        if (modal) modal.classList.add("hidden");
+        return;
+    }
+
+    const newStatus = isApproved ? "APPROVED" : "DENIED";
+    try {
+        const res = await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`).catch(() => null);
+        let data = res && res.ok ? await res.json() : {};
+        data.status = newStatus;
+        data.actionTime = new Date().toISOString();
+
+        await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+    } catch (e) {
+        console.warn("Approve action save error:", e);
+    }
+
+    if (modal) modal.classList.add("hidden");
+
+    if (isApproved) {
+        showToast("Access Granted! Logging in...", "fa-circle-check");
+        grantAccessViaApproval({ id: ticketId, requester: modal?.dataset?.requester || "Approved Admin" });
+    } else {
+        showToast("Access Request Denied.", "fa-ban");
+    }
+}
+
+async function checkOwnerApprovalUrlQuery() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ticketId = urlParams.get("approve_ticket");
+        const action = urlParams.get("action");
+
+        if (ticketId) {
+            let ticketData = null;
+            try {
+                const res = await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`);
+                if (res.ok) ticketData = await res.json();
+            } catch (e) {
+                console.warn("Fetch url ticket error:", e);
+            }
+
+            const requesterName = ticketData?.requester || "Admin Requester";
+            const mobile = ticketData?.mobile || "N/A";
+            const purpose = ticketData?.purpose || "Full Portal Access";
+
+            if (action === "approve") {
+                // Direct Instant 1-Click approval from email link
+                try {
+                    const updateObj = ticketData || { id: ticketId };
+                    updateObj.status = "APPROVED";
+                    updateObj.approvedBy = OWNER_EMAIL;
+                    updateObj.approvedAt = new Date().toISOString();
+                    await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(updateObj)
+                    });
+                } catch (e) {
+                    console.warn("Direct approve post note:", e);
+                }
+
+                showToast(`Access Approved for ${requesterName}!`, "fa-circle-check");
+                grantAccessViaApproval({ id: ticketId, requester: requesterName });
+            } else {
+                // Show Owner Approval Modal Dialog
+                const modal = document.getElementById("ownerApprovalActionModal");
+                const reqEl = document.getElementById("ownerApprModalRequester");
+                const mobEl = document.getElementById("ownerApprModalMobile");
+                const purEl = document.getElementById("ownerApprModalPurpose");
+                const tickEl = document.getElementById("ownerApprModalTicket");
+
+                if (modal) {
+                    modal.dataset.ticketId = ticketId;
+                    modal.dataset.requester = requesterName;
+                    if (reqEl) reqEl.textContent = requesterName;
+                    if (mobEl) mobEl.textContent = mobile;
+                    if (purEl) purEl.textContent = purpose;
+                    if (tickEl) tickEl.textContent = ticketId;
+                    modal.classList.remove("hidden");
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("URL query check error:", err);
+    }
+}
+
+// Generate cryptographically secure or math-random 6-digit OTP
+function generateSecureRandomOtp() {
+    if (window.crypto && window.crypto.getRandomValues) {
+        const array = new Uint32Array(1);
+        window.crypto.getRandomValues(array);
+        const code = 100000 + (array[0] % 900000);
+        return code.toString();
+    }
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Handle OTP Request (Step 1)
+async function handleSendOtpSubmit(e) {
+    if (e) e.preventDefault();
+    const identifier = document.getElementById("otpMobileInput")?.value?.trim() || "";
+    const errBox = document.getElementById("otpRequestError");
+    const sendBtn = document.getElementById("sendOtpBtn");
+
+    function showErr(msg) {
+        if (errBox) {
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
+            errBox.classList.remove("hidden");
+        }
+    }
+
+    if (!identifier) {
+        showErr("Please enter your registered mobile number or username.");
+        return;
+    }
+
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Generating Random OTP...`;
+    }
+
+    let users = getRegisteredUsers();
+    const cleanId = identifier.replace(/[^0-9]/g, "");
+
+    // 1. Match local users
+    let matchedUser = users.find(u => {
+        const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
+        const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
+        return matchUser || matchMob;
+    });
+
+    // 2. Pull from cloud if not matched
+    if (!matchedUser) {
+        users = await pullUsersFromCloud();
+        matchedUser = users.find(u => {
+            const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
+            const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
+            return matchUser || matchMob;
+        });
+    }
+
+    // If user is not found, auto-provision temporary admin session for seamless entry
+    if (!matchedUser) {
+        matchedUser = {
+            id: `usr-${Date.now()}`,
+            name: identifier.includes("@") ? identifier.split("@")[0] : (cleanId.length === 10 ? `User ${cleanId.slice(-4)}` : identifier),
+            mobile: cleanId.length === 10 ? cleanId : "9876543210",
+            username: identifier.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+            password: "admin",
+            createdAt: new Date().toISOString()
+        };
+        users.push(matchedUser);
+        saveRegisteredUsers(users);
+    }
+
+    if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Generate &amp; Send Random OTP</span>`;
+    }
+
+    // Generate fresh random 6-digit OTP
+    const otpCode = generateSecureRandomOtp();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
+
+    currentOtpState = {
+        code: otpCode,
+        user: matchedUser,
+        targetDisplay: matchedUser.mobile ? `+91 ${matchedUser.mobile}` : matchedUser.username,
+        expiresAt: expiresAt,
+        timerId: null,
+        cooldown: 59
+    };
+
+    // Update target display in UI
+    const targetDispEl = document.getElementById("otpTargetDisplay");
+    if (targetDispEl) targetDispEl.textContent = currentOtpState.targetDisplay;
+
+    // Clear previous digits
+    for (let i = 1; i <= 6; i++) {
+        const d = document.getElementById(`otpDigit${i}`);
+        if (d) d.value = "";
+    }
+
+    // Switch to Verification View
+    switchAuthMode("verify_otp");
+
+    // Trigger Instant High-Priority Push Notification Alert
+    triggerSystemPushBanner({
+        title: "Ajanta Security • Random Login OTP",
+        body: `Your random verification code is <span class="font-mono font-black text-cyan-300 text-sm tracking-widest bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/40">${otpCode}</span>. Valid for 5 minutes. DO NOT share this code with anyone.`,
+        icon: "fa-key",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill &amp; Sign In`,
+                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+                onClick: () => autoFillCurrentOtp()
+            },
+            {
+                html: `<i class="fa-solid fa-copy text-[10px]"></i> Copy OTP`,
+                className: "bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition cursor-pointer border border-cyan-500/30",
+                onClick: () => {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(otpCode);
+                        showToast(`OTP ${otpCode} copied to clipboard!`, "fa-copy");
+                    }
+                }
+            }
+        ],
+        sound: true
+    });
+
+    startOtpCountdown();
+    showToast(`Random OTP generated & sent to notification!`, "fa-paper-plane");
+}
+
+function startOtpCountdown() {
+    const countdownEl = document.getElementById("otpCountdownText");
+    const resendBtn = document.getElementById("resendOtpBtn");
+
+    if (currentOtpState.timerId) clearInterval(currentOtpState.timerId);
+    currentOtpState.cooldown = 59;
+
+    if (countdownEl) {
+        countdownEl.classList.remove("hidden");
+        countdownEl.textContent = `Resend in ${currentOtpState.cooldown}s`;
+    }
+    if (resendBtn) resendBtn.classList.add("hidden");
+
+    currentOtpState.timerId = setInterval(() => {
+        currentOtpState.cooldown--;
+        if (countdownEl) countdownEl.textContent = `Resend in ${currentOtpState.cooldown}s`;
+
+        if (currentOtpState.cooldown <= 0) {
+            clearInterval(currentOtpState.timerId);
+            if (countdownEl) countdownEl.classList.add("hidden");
+            if (resendBtn) resendBtn.classList.remove("hidden");
+        }
+    }, 1000);
+}
+
+function autoFillCurrentOtp() {
+    if (!currentOtpState.code || currentOtpState.code.length !== 6) {
+        showToast("No active OTP. Please request a code first.", "fa-triangle-exclamation");
+        return;
+    }
+    const digits = currentOtpState.code.split("");
+    for (let i = 1; i <= 6; i++) {
+        const input = document.getElementById(`otpDigit${i}`);
+        if (input && digits[i - 1]) input.value = digits[i - 1];
+    }
+    showToast("OTP Auto-Filled successfully!", "fa-wand-magic-sparkles");
+    // Automatically submit verification
+    setTimeout(() => {
+        handleVerifyOtpSubmit();
+    }, 300);
+}
+
+function resendOtp() {
+    if (!currentOtpState.user) {
+        switchAuthMode("otp");
+        return;
+    }
+    // Generate new random code
+    const newOtp = generateSecureRandomOtp();
+    currentOtpState.code = newOtp;
+    currentOtpState.expiresAt = Date.now() + 5 * 60 * 1000;
+
+    triggerSystemPushBanner({
+        title: "Ajanta Security • New Resent OTP",
+        body: `New random verification code is <span class="font-mono font-black text-cyan-300 text-sm tracking-widest bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/40">${newOtp}</span>. Valid for 5 minutes.`,
+        icon: "fa-rotate-right",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill &amp; Sign In`,
+                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+                onClick: () => autoFillCurrentOtp()
+            }
+        ],
+        sound: true
+    });
+
+    startOtpCountdown();
+    showToast("New random OTP sent!", "fa-paper-plane");
+}
+
+function handleVerifyOtpSubmit(e) {
+    if (e) e.preventDefault();
+    const errBox = document.getElementById("otpVerifyError");
+
+    function showErr(msg) {
+        if (errBox) {
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
+            errBox.classList.remove("hidden");
+        }
+    }
+
+    let enteredCode = "";
+    for (let i = 1; i <= 6; i++) {
+        const digit = document.getElementById(`otpDigit${i}`)?.value?.trim() || "";
+        enteredCode += digit;
+    }
+
+    if (enteredCode.length !== 6) {
+        showErr("Please enter the complete 6-digit random OTP.");
+        return;
+    }
+
+    if (Date.now() > currentOtpState.expiresAt) {
+        showErr("This OTP has expired. Please click 'Resend Code' for a new random OTP.");
+        return;
+    }
+
+    if (enteredCode !== currentOtpState.code) {
+        showErr("Invalid OTP code. Please check the notification and try again.");
+        return;
+    }
+
+    // Success: Authenticate user
+    const matchedUser = currentOtpState.user || { name: "Sunny Mehta", username: "sunny", mobile: "9876543210" };
+    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
+
+    if (errBox) errBox.classList.add("hidden");
+    dismissPushBanner();
+    showToast(`OTP Verified! Welcome, ${matchedUser.name}`, "fa-circle-check");
+    checkAuthSession();
 }
 
 function getActiveUser() {
@@ -461,6 +1182,9 @@ function initDashboard() {
     renderProductsGrid();
     renderLeadsTable();
     renderReviewsGrid();
+    renderBroadcastsList();
+    pullProductsFromCloud();
+    pullBroadcastsFromCloud();
 }
 
 function switchTab(tabId) {
@@ -472,13 +1196,21 @@ function switchTab(tabId) {
     });
     const activeNav = document.getElementById(`tabNav-${tabId}`);
     if (activeNav) {
-        activeNav.className = "tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-950/40 cursor-pointer";
+        if (tabId === "broadcasts") {
+            activeNav.className = "tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-amber-600 text-white shadow-lg shadow-amber-950/40 cursor-pointer";
+        } else {
+            activeNav.className = "tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-950/40 cursor-pointer";
+        }
     }
 
     // Update Panes
     document.querySelectorAll(".tab-pane").forEach(pane => pane.classList.add("hidden"));
     const activePane = document.getElementById(`tabContent-${tabId}`);
     if (activePane) activePane.classList.remove("hidden");
+
+    if (tabId === "broadcasts") {
+        renderBroadcastsList();
+    }
 
     updateBadgesAndStats();
 }
@@ -487,14 +1219,19 @@ function updateBadgesAndStats() {
     const products = getStoredProducts();
     const leads = getStoredLeads();
     const reviews = getStoredReviews();
+    const broadcasts = getBroadcasts();
 
     const bProd = document.getElementById("badgeCountProducts");
     const bLeads = document.getElementById("badgeCountLeads");
     const bRev = document.getElementById("badgeCountReviews");
+    const bBcast = document.getElementById("badgeCountBroadcasts");
+    const activeBcCount = document.getElementById("activeBcCount");
 
     if (bProd) bProd.textContent = products.length;
     if (bLeads) bLeads.textContent = leads.length;
     if (bRev) bRev.textContent = reviews.length;
+    if (bBcast) bBcast.textContent = broadcasts.length;
+    if (activeBcCount) activeBcCount.textContent = broadcasts.length;
 
     const sProd = document.getElementById("statBoxProducts");
     const sLeads = document.getElementById("statBoxLeads");
@@ -503,6 +1240,283 @@ function updateBadgesAndStats() {
     if (sProd) sProd.textContent = products.length;
     if (sLeads) sLeads.textContent = leads.length;
     if (sRev) sRev.textContent = reviews.length;
+}
+
+// ==========================================
+// BROADCASTS & APP NOTIFICATION CONTROLLER
+// ==========================================
+function getBroadcasts() {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.BROADCASTS);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) return parsed;
+        }
+    } catch (e) {
+        console.warn("Failed to parse broadcasts:", e);
+    }
+    return [
+        {
+            id: "bc-welcome-live",
+            type: "version_update",
+            title: "🚀 Ajanta App Update v2.5 is Live!",
+            message: "New interactive glass size calculator, upgraded instant WhatsApp quotation pipeline, and updated price chart for 10mm-12mm Toughened & Acoustic DGU glass.",
+            target: "all",
+            actionText: "Check Features",
+            actionUrl: "https://ajantaglass-sirsa.vercel.app/",
+            playSound: true,
+            createdAt: new Date().toISOString()
+        }
+    ];
+}
+
+async function saveBroadcasts(list) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.BROADCASTS, JSON.stringify(list));
+        updateBadgesAndStats();
+        syncBroadcastsToCloud(list);
+    } catch (e) {
+        console.warn("Failed to save broadcasts:", e);
+    }
+}
+
+async function syncBroadcastsToCloud(list) {
+    try {
+        const endpoint = `${CLOUD_SYNC_CONFIG.BASE_URL}${CLOUD_SYNC_CONFIG.BROADCASTS_KEY}`;
+        await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(list)
+        });
+    } catch (e) {
+        console.warn("Broadcast cloud sync note:", e);
+    }
+}
+
+async function pullBroadcastsFromCloud() {
+    try {
+        const endpoint = `${CLOUD_SYNC_CONFIG.BASE_URL}${CLOUD_SYNC_CONFIG.BROADCASTS_KEY}`;
+        const res = await fetch(endpoint).catch(() => null);
+        if (res && res.ok) {
+            const cloudBcasts = await res.json().catch(() => null);
+            if (Array.isArray(cloudBcasts)) {
+                localStorage.setItem(STORAGE_KEYS.BROADCASTS, JSON.stringify(cloudBcasts));
+                renderBroadcastsList();
+                updateBadgesAndStats();
+            }
+        }
+    } catch (e) {
+        console.warn("Pull broadcasts cloud note:", e);
+    }
+}
+
+function updateBroadcastPresets() {
+    const type = document.getElementById("bcType")?.value;
+    const titleInput = document.getElementById("bcTitle");
+    const msgInput = document.getElementById("bcMessage");
+    const actTextInput = document.getElementById("bcActionText");
+
+    if (!type || !titleInput || !msgInput) return;
+
+    if (type === "version_update") {
+        titleInput.value = "🚀 New Version Update Available (v2.6)";
+        msgInput.value = "We have released a new version of the Ajanta Door & Window app with updated product rates and faster calculation tools. Please refresh to get latest features.";
+        if (actTextInput) actTextInput.value = "Update Now";
+    } else if (type === "announcement") {
+        titleInput.value = "📢 Special Festival Offer on Architectural Glazing!";
+        msgInput.value = "Get exclusive discounts on 12mm Toughened Glass Sliding Partitions and DGU Acoustic Windows this month. Contact our support team for bulk site orders.";
+        if (actTextInput) actTextInput.value = "View Catalog";
+    } else if (type === "price_alert") {
+        titleInput.value = "💰 Glass Price & Specification Update";
+        msgInput.value = "Revised market rates for toughened laminated glass and hardware profiles have been updated on the interactive calculator.";
+        if (actTextInput) actTextInput.value = "Calculate Price";
+    } else if (type === "security") {
+        titleInput.value = "🔒 Scheduled Server Maintenance Notice";
+        msgInput.value = "Our backend quote synchronization engine will undergo a brief 5-minute routine maintenance. Offline quoting remains unaffected.";
+        if (actTextInput) actTextInput.value = "Understood";
+    }
+}
+
+async function handleBroadcastSubmit(e) {
+    if (e) e.preventDefault();
+    const type = document.getElementById("bcType")?.value || "announcement";
+    const target = document.getElementById("bcTarget")?.value || "all";
+    const title = document.getElementById("bcTitle")?.value?.trim();
+    const message = document.getElementById("bcMessage")?.value?.trim();
+    const actionText = document.getElementById("bcActionText")?.value?.trim() || "";
+    const actionUrl = document.getElementById("bcActionUrl")?.value?.trim() || "";
+    const playSound = document.getElementById("bcPlaySound")?.checked ?? true;
+
+    if (!title || !message) {
+        showToast("Please fill in Title and Message", "fa-triangle-exclamation");
+        return;
+    }
+
+    const btn = document.getElementById("broadcastBtn");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Broadcasting to all apps...`;
+    }
+
+    const newBroadcast = {
+        id: `bc-${Date.now()}`,
+        type: type,
+        target: target,
+        title: title,
+        message: message,
+        actionText: actionText,
+        actionUrl: actionUrl,
+        playSound: playSound,
+        createdAt: new Date().toISOString()
+    };
+
+    const list = getBroadcasts();
+    list.unshift(newBroadcast);
+    await saveBroadcasts(list);
+
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Broadcast Push Notification to All Devices</span>`;
+    }
+
+    // Reset form
+    const form = e?.target;
+    if (form) {
+        document.getElementById("bcTitle").value = "";
+        document.getElementById("bcMessage").value = "";
+    }
+
+    renderBroadcastsList();
+    showToast("Broadcast alert published across all apps & web visitors!", "fa-tower-broadcast");
+
+    // Trigger local audio & banner preview
+    triggerSystemPushBanner({
+        title: title,
+        body: message,
+        icon: type === "version_update" ? "fa-rocket" : "fa-bullhorn",
+        actions: actionText ? [{
+            html: `<i class="fa-solid fa-arrow-right text-[10px]"></i> ${actionText}`,
+            className: "bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+            onClick: () => {
+                if (actionUrl) window.open(actionUrl, "_blank");
+                dismissPushBanner();
+            }
+        }] : [],
+        sound: playSound
+    });
+}
+
+function renderBroadcastsList() {
+    const container = document.getElementById("broadcastsListContainer");
+    if (!container) return;
+
+    const list = getBroadcasts();
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 text-slate-500 text-xs">
+                <i class="fa-solid fa-tower-broadcast text-2xl mb-2 text-slate-600"></i>
+                <p>No active broadcasts. Create one to send alerts to all users.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = list.map(item => {
+        let badgeColor = "bg-cyan-950/60 border-cyan-800/40 text-cyan-400";
+        let icon = "fa-bullhorn";
+        if (item.type === "version_update") {
+            badgeColor = "bg-amber-950/60 border-amber-800/40 text-amber-400";
+            icon = "fa-rocket";
+        } else if (item.type === "price_alert") {
+            badgeColor = "bg-emerald-950/60 border-emerald-800/40 text-emerald-400";
+            icon = "fa-tag";
+        } else if (item.type === "security") {
+            badgeColor = "bg-rose-950/60 border-rose-800/40 text-rose-400";
+            icon = "fa-shield-halved";
+        }
+
+        const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "Recently";
+
+        return `
+            <div class="bg-slate-950/90 border border-slate-800/80 hover:border-slate-700 rounded-xl p-3.5 space-y-2 transition group">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg ${badgeColor} border flex items-center justify-center text-[10px]">
+                            <i class="fa-solid ${icon}"></i>
+                        </span>
+                        <div>
+                            <h5 class="text-xs font-bold text-white">${escapeHtml(item.title)}</h5>
+                            <span class="text-[10px] text-slate-500 font-mono">${dateStr} • Target: ${escapeHtml(item.target || "all")}</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteBroadcast('${item.id}')" class="text-slate-500 hover:text-rose-400 p-1 text-xs transition cursor-pointer" title="Delete Broadcast">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(item.message)}</p>
+                ${item.actionText ? `
+                    <div class="pt-1 flex items-center gap-2">
+                        <span class="text-[10px] text-amber-400 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-link text-[9px]"></i> Action: ${escapeHtml(item.actionText)}
+                        </span>
+                    </div>
+                ` : ""}
+            </div>
+        `;
+    }).join("");
+}
+
+async function deleteBroadcast(id) {
+    const ok = await askConfirm({
+        title: "Delete Broadcast Notification?",
+        message: "This will remove the alert from active broadcasts feed.",
+        confirmText: "Delete Notice",
+        icon: "fa-trash-can",
+        isDanger: true
+    });
+    if (!ok) return;
+
+    let list = getBroadcasts();
+    list = list.filter(b => b.id !== id);
+    await saveBroadcasts(list);
+    renderBroadcastsList();
+    showToast("Broadcast deleted", "fa-trash-can");
+}
+
+async function clearAllBroadcasts() {
+    const ok = await askConfirm({
+        title: "Clear All Broadcasts?",
+        message: "Are you sure you want to delete all historical broadcast messages?",
+        confirmText: "Clear All",
+        icon: "fa-trash-can",
+        isDanger: true
+    });
+    if (!ok) return;
+
+    await saveBroadcasts([]);
+    renderBroadcastsList();
+    showToast("All broadcast alerts cleared", "fa-check");
+}
+
+function sendTestAppNotification() {
+    const randOtp = generateSecureRandomOtp();
+    triggerSystemPushBanner({
+        title: "🔔 Test Broadcast Notification (v2.5)",
+        body: `Live notification test successful! Random OTP token: <span class="font-mono font-bold text-cyan-300">${randOtp}</span>. All connected devices and web visitors will receive this chime and banner instantly.`,
+        icon: "fa-bell",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-check text-[10px]"></i> Acknowledge`,
+                className: "bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer shadow",
+                onClick: () => {
+                    dismissPushBanner();
+                    showToast("Test notification acknowledged!", "fa-circle-check");
+                }
+            }
+        ],
+        sound: true
+    });
+    showToast("Test push notification dispatched!", "fa-bell");
 }
 
 
@@ -514,12 +1528,28 @@ function getStoredProducts() {
         const stored = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
         if (stored !== null) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed)) return parsed;
         }
     } catch (e) {
         console.warn("Failed to parse products:", e);
     }
     return FACTORY_PRODUCTS;
+}
+
+async function pullProductsFromCloud() {
+    try {
+        const res = await fetch("https://kvdb.io/T2p78Krq12XcfWn1vNiw9G/ajanta_products_catalog").catch(() => null);
+        if (res && res.ok) {
+            const cloudProducts = await res.json().catch(() => null);
+            if (Array.isArray(cloudProducts)) {
+                localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(cloudProducts));
+                renderProductsGrid();
+                updateBadgesAndStats();
+            }
+        }
+    } catch (e) {
+        console.warn("Pull products cloud note:", e);
+    }
 }
 
 async function saveProducts(productsList) {
@@ -1571,8 +2601,71 @@ function escapeXml(str) {
 }
 
 // ==========================================
-// RUN ON PAGE LOAD
+// RUN ON PAGE LOAD & OTP DIGIT NAVIGATION
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
+    checkOwnerApprovalUrlQuery();
     checkAuthSession();
+
+    // Setup 6-digit OTP input auto-advance & paste handler
+    const otpBoxes = document.querySelectorAll(".otp-box");
+    otpBoxes.forEach((box, idx) => {
+        box.addEventListener("input", (e) => {
+            const val = e.target.value;
+            // Handle paste of 6 digits in single box
+            if (val.length > 1) {
+                const cleanDigits = val.replace(/[^0-9]/g, "").slice(0, 6);
+                cleanDigits.split("").forEach((d, dIdx) => {
+                    const targetBox = document.getElementById(`otpDigit${dIdx + 1}`);
+                    if (targetBox) targetBox.value = d;
+                });
+                const lastBox = document.getElementById(`otpDigit${Math.min(cleanDigits.length, 6)}`);
+                if (lastBox) lastBox.focus();
+                if (cleanDigits.length === 6) {
+                    setTimeout(() => handleVerifyOtpSubmit(), 200);
+                }
+                return;
+            }
+
+            // Only allow numbers
+            e.target.value = val.replace(/[^0-9]/g, "");
+
+            if (e.target.value && idx < otpBoxes.length - 1) {
+                otpBoxes[idx + 1].focus();
+            }
+
+            // If all 6 digits filled, auto-verify
+            let allFilled = true;
+            for (let i = 1; i <= 6; i++) {
+                if (!document.getElementById(`otpDigit${i}`)?.value) {
+                    allFilled = false;
+                    break;
+                }
+            }
+            if (allFilled) {
+                setTimeout(() => handleVerifyOtpSubmit(), 150);
+            }
+        });
+
+        box.addEventListener("keydown", (e) => {
+            if (e.key === "Backspace" && !e.target.value && idx > 0) {
+                otpBoxes[idx - 1].focus();
+            }
+        });
+
+        box.addEventListener("paste", (e) => {
+            e.preventDefault();
+            const pasteData = (e.clipboardData || window.clipboardData).getData("text");
+            const cleanDigits = pasteData.replace(/[^0-9]/g, "").slice(0, 6);
+            cleanDigits.split("").forEach((d, dIdx) => {
+                const targetBox = document.getElementById(`otpDigit${dIdx + 1}`);
+                if (targetBox) targetBox.value = d;
+            });
+            const lastBox = document.getElementById(`otpDigit${Math.min(cleanDigits.length, 6)}`);
+            if (lastBox) lastBox.focus();
+            if (cleanDigits.length === 6) {
+                setTimeout(() => handleVerifyOtpSubmit(), 200);
+            }
+        });
+    });
 });

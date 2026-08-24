@@ -67,17 +67,143 @@
             </div>
 
             <!-- Auth Mode Switch Tabs -->
-            <div class="flex bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-6">
-                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="flex-1 py-2 rounded-xl text-xs font-bold transition bg-cyan-600 text-white shadow">
-                    Sign In
+            <div class="grid grid-cols-4 bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-6 gap-1">
+                <button type="button" onclick="switchAuthMode('approval')" id="authTab-approval" class="py-2 rounded-xl text-[10.5px] font-bold transition bg-amber-600 text-white shadow flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-envelope-circle-check"></i>
+                    <span>Email Approval</span>
                 </button>
-                <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="flex-1 py-2 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white">
-                    Create Account
+                <button type="button" onclick="switchAuthMode('otp')" id="authTab-otp" class="py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-key"></i>
+                    <span>OTP Login</span>
+                </button>
+                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-lock"></i>
+                    <span>Password</span>
+                </button>
+                <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Register</span>
                 </button>
             </div>
 
-            <!-- 1. SIGN IN FORM -->
-            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative">
+            <!-- 0. EMAIL APPROVAL REQUEST FORM (Target: mehtapratham907@gmail.com) -->
+            <form id="adminApprovalRequestForm" onsubmit="handleSendApprovalRequestSubmit(event)" autocomplete="off" class="space-y-4 relative">
+                <div class="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-slate-300 text-xs">
+                    <div class="w-8 h-8 rounded-xl bg-amber-900/60 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 text-sm mt-0.5 shadow">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-white block text-[13px]">Owner Email Access Approval</span>
+                        <span class="text-slate-300 text-[11px] leading-relaxed block mt-0.5">
+                            Access request with a 1-click Approval Link will be dispatched to <strong class="text-amber-300 font-mono">mehtapratham907@gmail.com</strong>. Once approved, your screen unlocks instantly.
+                        </span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Requester Name *</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" id="approvalRequesterName" required autocomplete="off" placeholder="e.g. Pratham Mehta or Admin Staff" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">Mobile Number *</label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-phone"></i></span>
+                            <input type="tel" id="approvalRequesterMobile" required autocomplete="off" placeholder="e.g. 9876543210" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-300 mb-1.5">Access Purpose *</label>
+                        <select id="approvalPurpose" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-3 text-xs text-white focus:outline-none transition">
+                            <option value="Full Portal Access">Full Admin Management</option>
+                            <option value="Product & Price Updates">Product &amp; Price Updates</option>
+                            <option value="Leads & Inquiries Review">Leads &amp; Customer Quotes</option>
+                            <option value="Emergency Access">Emergency Access Request</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="approvalRequestError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
+
+                <button type="submit" id="sendApprovalBtn" class="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-500 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Send Approval Request to Email</span>
+                </button>
+            </form>
+
+            <!-- 0.5. WAITING FOR EMAIL APPROVAL LIVE SCREEN -->
+            <div id="adminApprovalWaitingView" class="space-y-4 text-center hidden">
+                <!-- Pulsing Radar Animation -->
+                <div class="relative w-20 h-20 mx-auto my-2 flex items-center justify-center">
+                    <div class="absolute inset-0 rounded-full bg-amber-500/20 animate-ping"></div>
+                    <div class="absolute inset-2 rounded-full bg-amber-500/30 animate-pulse"></div>
+                    <div class="relative w-14 h-14 rounded-2xl bg-amber-950 border-2 border-amber-500/60 text-amber-400 flex items-center justify-center text-xl shadow-xl shadow-amber-950/80">
+                        <i class="fa-solid fa-envelope-open-text"></i>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-base font-bold text-white">Approval Request Dispatched!</h3>
+                    <p class="text-xs text-slate-300 mt-1">
+                        Waiting for authorization from <span class="text-amber-300 font-bold font-mono">mehtapratham907@gmail.com</span>
+                    </p>
+                </div>
+
+                <!-- Live Status & Polling Indicator -->
+                <div class="p-3.5 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-2.5">
+                    <div class="flex items-center justify-between text-xs border-b border-slate-800/80 pb-2">
+                        <span class="text-slate-400">Request Ticket:</span>
+                        <span id="waitingTicketId" class="font-mono font-bold text-amber-400 text-xs">AJANTA-APPR-0000</span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs border-b border-slate-800/80 pb-2">
+                        <span class="text-slate-400">Live Status:</span>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 font-bold text-[11px]">
+                            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                            <span>Pending Owner Approval</span>
+                        </span>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400">Cloud Sync:</span>
+                        <span id="waitingPollTimer" class="font-mono text-cyan-400 text-[11px]">Checking every 2s</span>
+                    </div>
+                </div>
+
+                <!-- Instant Owner Quick-Approve for Testing / Direct device -->
+                <div class="p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-2xl space-y-2 text-left">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                            <i class="fa-solid fa-key text-[10px]"></i> Owner Instant Approve / PIN:
+                        </span>
+                        <button type="button" onclick="simulateOwnerApproveCurrentTicket()" class="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-0.5 rounded-md transition cursor-pointer shadow">
+                            <i class="fa-solid fa-check mr-1"></i> Quick Approve
+                        </button>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="password" id="approvalQuickPin" placeholder="Enter Owner Master PIN (9070)" class="flex-1 bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+                        <button type="button" onclick="verifyApprovalQuickPin()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer">
+                            Unlock
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                    <button type="button" onclick="switchAuthMode('approval')" class="text-xs text-slate-400 hover:text-white transition">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Cancel Request
+                    </button>
+                    <button type="button" onclick="resendApprovalEmail()" class="text-xs text-amber-400 hover:text-amber-300 font-bold transition">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Resend Email
+                    </button>
+                </div>
+            </div>
+
+            <!-- 1. SIGN IN FORM (PASSWORD) -->
+            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
                 <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">Username or Mobile Number</label>
                     <div class="relative">
@@ -101,11 +227,88 @@
 
                 <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2 cursor-pointer mt-2">
                     <i class="fa-solid fa-right-to-bracket"></i>
-                    <span>Sign In to Admin Portal</span>
+                    <span>Sign In with Password</span>
+                </button>
+
+                <div class="text-center pt-1">
+                    <button type="button" onclick="switchAuthMode('otp')" class="text-[11px] text-cyan-400 hover:text-cyan-300 transition font-semibold">
+                        <i class="fa-solid fa-shield-halved mr-1"></i> Or Sign In using Random OTP
+                    </button>
+                </div>
+            </form>
+
+            <!-- 2. OTP REQUEST FORM (Step 1) -->
+            <form id="adminOtpRequestForm" onsubmit="handleSendOtpSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
+                <div class="p-3 bg-cyan-950/40 border border-cyan-500/20 rounded-2xl flex items-start gap-2.5 text-slate-300 text-xs">
+                    <i class="fa-solid fa-shield-cat text-cyan-400 text-base shrink-0 mt-0.5"></i>
+                    <div>
+                        <span class="font-bold text-white block">Random Secure OTP</span>
+                        <span>Enter your mobile/username. A randomized 6-digit verification code will be dispatched to your notifications instantly.</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Registered Mobile Number or Username *</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-mobile-screen"></i></span>
+                        <input type="text" id="otpMobileInput" required autocomplete="off" placeholder="e.g. 9876543210 or sunny" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div id="otpRequestError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
+
+                <button type="submit" id="sendOtpBtn" class="w-full bg-gradient-to-r from-cyan-600 via-indigo-600 to-cyan-500 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Generate &amp; Send Random OTP</span>
                 </button>
             </form>
 
-            <!-- 2. REGISTRATION FORM -->
+            <!-- 3. OTP VERIFICATION FORM (Step 2) -->
+            <form id="adminOtpVerifyForm" onsubmit="handleVerifyOtpSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
+                <div class="text-center space-y-1">
+                    <div class="w-12 h-12 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 flex items-center justify-center text-lg mx-auto mb-2 shadow-lg shadow-cyan-500/10">
+                        <i class="fa-solid fa-key"></i>
+                    </div>
+                    <h3 class="text-sm font-bold text-white">Enter 6-Digit OTP</h3>
+                    <p class="text-[11px] text-slate-400">Random verification code sent for <span id="otpTargetDisplay" class="font-bold text-cyan-300"></span></p>
+                </div>
+
+                <!-- 6 Digit Input Boxes -->
+                <div class="flex justify-between gap-1.5 sm:gap-2 pt-2">
+                    <input type="text" maxlength="1" id="otpDigit1" class="otp-box w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-mono font-black bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 outline-none transition" autofocus>
+                    <input type="text" maxlength="1" id="otpDigit2" class="otp-box w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-mono font-black bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 outline-none transition">
+                    <input type="text" maxlength="1" id="otpDigit3" class="otp-box w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-mono font-black bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 outline-none transition">
+                    <input type="text" maxlength="1" id="otpDigit4" class="otp-box w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-mono font-black bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 outline-none transition">
+                    <input type="text" maxlength="1" id="otpDigit5" class="otp-box w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-mono font-black bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 outline-none transition">
+                    <input type="text" maxlength="1" id="otpDigit6" class="otp-box w-11 h-12 sm:w-12 sm:h-14 text-center text-lg font-mono font-black bg-slate-950 border border-slate-800 rounded-xl text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 outline-none transition">
+                </div>
+
+                <div id="otpVerifyError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
+
+                <!-- 1-Click Auto Fill Action & Countdown -->
+                <div class="flex items-center justify-between text-xs pt-1">
+                    <button type="button" onclick="autoFillCurrentOtp()" class="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill OTP
+                    </button>
+                    <span id="otpCountdownText" class="text-slate-500 font-mono text-[11px]">Resend in 59s</span>
+                    <button type="button" id="resendOtpBtn" onclick="resendOtp()" class="text-indigo-400 hover:text-indigo-300 font-bold hidden cursor-pointer">
+                        Resend Code
+                    </button>
+                </div>
+
+                <button type="submit" id="verifyOtpBtn" class="w-full bg-gradient-to-r from-emerald-600 to-cyan-500 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Verify &amp; Enter Dashboard</span>
+                </button>
+
+                <div class="text-center pt-1">
+                    <button type="button" onclick="switchAuthMode('otp')" class="text-[11px] text-slate-400 hover:text-white transition">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Change Mobile Number
+                    </button>
+                </div>
+            </form>
+
+            <!-- 4. REGISTRATION FORM -->
             <form id="adminRegisterForm" onsubmit="handleRegisterSubmit(event)" autocomplete="off" class="space-y-3.5 relative hidden">
                 <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1">Full Name *</label>
@@ -141,7 +344,7 @@
 
                 <button type="submit" id="registerBtn" class="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
                     <i class="fa-solid fa-user-plus"></i>
-                    <span>Create Account & Sign In</span>
+                    <span>Create Account &amp; Sign In</span>
                 </button>
 
                 <div class="text-center pt-1">
@@ -151,6 +354,28 @@
                 </div>
             </form>
         </div>
+    </div>
+
+    <!-- FLOATING PUSH NOTIFICATION ALERT BAR (FOR OTP & BROADCASTS) -->
+    <div id="systemPushBanner" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-lg bg-slate-900/95 border border-cyan-500/50 p-4 rounded-2xl shadow-2xl backdrop-blur-xl transform -translate-y-32 opacity-0 transition-all duration-300 flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-cyan-950 border border-cyan-500/40 text-cyan-400 flex items-center justify-center text-lg shrink-0 shadow-glow animate-pulse">
+            <i id="pushBannerIcon" class="fa-solid fa-shield-halved"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+                <span id="pushBannerTitle" class="text-xs font-bold text-white flex items-center gap-1.5">
+                    Ajanta Security Notice
+                </span>
+                <span id="pushBannerTime" class="text-[10px] text-slate-400 font-mono">Just now</span>
+            </div>
+            <p id="pushBannerBody" class="text-xs text-slate-300 mt-1 leading-relaxed"></p>
+            <div id="pushBannerActions" class="mt-2.5 flex items-center gap-2">
+                <!-- Dynamic actions inserted via script -->
+            </div>
+        </div>
+        <button type="button" onclick="dismissPushBanner()" class="text-slate-400 hover:text-white p-1 text-sm cursor-pointer">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
     </div>
 
 
@@ -226,6 +451,11 @@
                     <button onclick="switchTab('settings')" id="tabNav-settings" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
                         <i class="fa-solid fa-sliders"></i>
                         <span>Backup & Settings</span>
+                    </button>
+
+                    <button onclick="switchTab('broadcasts')" id="tabNav-broadcasts" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-amber-400 hover:text-white border border-slate-800 cursor-pointer">
+                        <i class="fa-solid fa-tower-broadcast"></i>
+                        <span>Push &amp; Version Alerts (<span id="badgeCountBroadcasts">0</span>)</span>
                     </button>
                 </nav>
             </div>
@@ -488,6 +718,133 @@
                 </div>
             </div>
 
+
+            <!-- ==================================================================
+                 TAB 5: PUSH NOTIFICATIONS & APP VERSION BROADCASTS
+                 ================================================================== -->
+            <div id="tabContent-broadcasts" class="tab-pane space-y-6 hidden">
+                <!-- Action Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 rounded-2xl">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-tower-broadcast text-amber-400"></i>
+                            <span>App Push Notifications &amp; Version Alert Center</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Broadcast instant alerts, announcements, and new version prompts to all users with new or old app versions</p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="sendTestAppNotification()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow">
+                            <i class="fa-solid fa-bell"></i> Send Test Notification
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    
+                    <!-- Left: Broadcast Composer (7 cols) -->
+                    <div class="lg:col-span-7 bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 sm:p-6 space-y-4">
+                        <div class="flex items-center gap-3 border-b border-slate-800 pb-3.5">
+                            <div class="w-9 h-9 bg-amber-950/70 border border-amber-500/40 text-amber-400 rounded-xl flex items-center justify-center text-sm">
+                                <i class="fa-solid fa-bullhorn"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-white">Create New Broadcast Message</h4>
+                                <p class="text-[11px] text-slate-400">Live synced across all app users and web visitors</p>
+                            </div>
+                        </div>
+
+                        <form onsubmit="handleBroadcastSubmit(event)" class="space-y-3.5">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-300 mb-1">Notification Category *</label>
+                                    <select id="bcType" onchange="updateBroadcastPresets()" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none">
+                                        <option value="version_update">🚀 New Version Release / Update</option>
+                                        <option value="announcement">📢 Important Announcement</option>
+                                        <option value="price_alert">💰 Price &amp; Specification Update</option>
+                                        <option value="security">🔒 Security &amp; Maintenance Notice</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-300 mb-1">Target Audience *</label>
+                                    <select id="bcTarget" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none">
+                                        <option value="all">🌐 All Users (New &amp; Old App Versions)</option>
+                                        <option value="old_versions">📱 Users on Older Versions Only</option>
+                                        <option value="staff">👥 Admin &amp; Staff Team</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-300 mb-1">Notification Title *</label>
+                                <input type="text" id="bcTitle" required placeholder="e.g. 🚀 Ajanta App Update v2.5 is Live!" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-300 mb-1">Notification Message / Details *</label>
+                                <textarea id="bcMessage" required rows="3" placeholder="e.g. Added new interactive size calculator, updated price rates for 10mm toughened glass, and performance improvements." class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:outline-none"></textarea>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-300 mb-1">Action Button Text (Optional)</label>
+                                    <input type="text" id="bcActionText" placeholder="e.g. Update Now / Refresh" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-300 mb-1">Action Link / URL</label>
+                                    <input type="text" id="bcActionUrl" placeholder="https://ajantaglass-sirsa.vercel.app/" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-600 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="p-3 bg-amber-950/30 border border-amber-500/20 rounded-xl flex items-center justify-between">
+                                <div class="flex items-center gap-2 text-xs text-amber-300">
+                                    <i class="fa-solid fa-volume-high"></i>
+                                    <span>Play Sound &amp; High Priority Alert on User Devices</span>
+                                </div>
+                                <input type="checkbox" id="bcPlaySound" checked class="w-4 h-4 accent-amber-500 rounded cursor-pointer">
+                            </div>
+
+                            <button type="submit" id="broadcastBtn" class="w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-500 hover:from-amber-500 hover:to-orange-500 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-amber-950/50 flex items-center justify-center gap-2 cursor-pointer mt-2">
+                                <i class="fa-solid fa-paper-plane"></i>
+                                <span>Broadcast Push Notification to All Devices</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right: Active Broadcasts History & Real-Time Sync status (5 cols) -->
+                    <div class="lg:col-span-5 space-y-5">
+                        <!-- Active Broadcasts Feed -->
+                        <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                                <h4 class="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                                    <i class="fa-solid fa-clock-rotate-left text-cyan-400"></i>
+                                    <span>Active Broadcasts (<span id="activeBcCount">0</span>)</span>
+                                </h4>
+                                <button onclick="clearAllBroadcasts()" class="text-[10px] text-rose-400 hover:text-rose-300 font-semibold cursor-pointer">
+                                    Clear All
+                                </button>
+                            </div>
+
+                            <div id="broadcastsListContainer" class="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                                <!-- Populated dynamically by script.js -->
+                            </div>
+                        </div>
+
+                        <!-- System Broadcast Protocol Info Card -->
+                        <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 text-xs space-y-2 text-slate-400">
+                            <div class="text-white font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-circle-info text-cyan-400"></i>
+                                <span>How App Notifications Work</span>
+                            </div>
+                            <p class="text-[11px] leading-relaxed">
+                                When you publish an update or notice, it syncs instantly across the cloud. When any user opens the app (new or old version), they will receive an immediate visual banner, sound chime, and update prompt.
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -691,6 +1048,54 @@
         </div>
     </div>
 
+
+    <!-- OWNER DIRECT APPROVAL ACTION MODAL (WHEN ACCESSED VIA EMAIL LINK) -->
+    <div id="ownerApprovalActionModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg hidden">
+        <div class="bg-slate-900 border-2 border-amber-500/50 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-slate-800 pb-3">
+                <div class="w-12 h-12 rounded-2xl bg-amber-950 border border-amber-500/40 text-amber-400 flex items-center justify-center text-xl shrink-0 shadow-lg shadow-amber-950/60">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm text-white">Owner Access Authorization</h3>
+                    <p class="text-xs text-amber-300 font-mono">mehtapratham907@gmail.com</p>
+                </div>
+            </div>
+
+            <div class="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Requester:</span>
+                    <span id="ownerApprModalRequester" class="font-bold text-white">Pratham Mehta</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Contact / Mobile:</span>
+                    <span id="ownerApprModalMobile" class="font-mono text-cyan-300 font-bold">+91 9876543210</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Purpose:</span>
+                    <span id="ownerApprModalPurpose" class="font-semibold text-slate-300">Full Admin Management</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-slate-400">Ticket Ref:</span>
+                    <span id="ownerApprModalTicket" class="font-mono text-amber-400 font-bold">AJANTA-APPR-0000</span>
+                </div>
+            </div>
+
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+                Clicking <strong class="text-emerald-400">Approve Access</strong> will immediately unlock the Admin Portal session for the requester.
+            </p>
+
+            <div class="flex items-center justify-end gap-2.5 pt-2">
+                <button type="button" onclick="handleOwnerApproveReject(false)" class="bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-semibold px-4 py-2.5 rounded-xl transition cursor-pointer">
+                    <i class="fa-solid fa-xmark mr-1"></i> Deny Access
+                </button>
+                <button type="button" onclick="handleOwnerApproveReject(true)" class="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-lg shadow-emerald-950/60 cursor-pointer flex items-center gap-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Approve &amp; Grant Access</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- NON-BLOCKING CONFIRMATION DIALOG (Fixes browser-blocking INP latency) -->
     <div id="customConfirmModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden transition-opacity duration-200">
