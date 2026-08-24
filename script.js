@@ -1056,7 +1056,7 @@ function renderLeadsTable(searchQuery = "") {
                                 ${lead.items.length} ${lead.items.length === 1 ? 'Spec' : 'Specs'}
                             </span>
                             <div class="text-[10px] text-slate-400 max-w-[220px] line-clamp-2 leading-relaxed">
-                                ${lead.items.map(it => `${escapeHtml(it.name || 'Glass')} (${escapeHtml(it.thickness || 'Std')}/${escapeHtml(it.edgework || 'None')}) ${it.width}"×${it.height}" [${it.qty}]`).join("; ")}
+                                ${lead.items.map(it => `${escapeHtml(it.name || 'Product')}${it.glassProfile ? ` (${escapeHtml(it.glassProfile)})` : ''} [${escapeHtml(it.thickness || 'Std')}/${escapeHtml(it.edgework || 'None')}] ${it.width}"×${it.height}" [Qty: ${it.qty}]`).join("; ")}
                             </div>
                         </div>
                     ` : `
@@ -1175,7 +1175,7 @@ function exportLeadsExcel() {
     leads.forEach(l => {
         const dateStr = l.createdAt ? new Date(l.createdAt).toLocaleDateString("en-IN") : "Recent";
         const itemsStr = (l.items && l.items.length) 
-            ? l.items.map(it => `${it.name || 'Glass'} [Thick: ${it.thickness || 'Std'}, Edge: ${it.edgework || 'None'}, Size: ${it.width}"x${it.height}", Qty: ${it.qty}]`).join(" | ")
+            ? l.items.map(it => `${it.name || 'Product'}${it.glassProfile ? ` (${it.glassProfile})` : ''} [Thick: ${it.thickness || 'Std'}, Edge: ${it.edgework || 'None'}, Size: ${it.width}"x${it.height}", Qty: ${it.qty}]`).join(" | ")
             : "Custom Scope";
 
         excelContent += `
@@ -1214,7 +1214,7 @@ function exportLeadsCSV() {
     const headers = ["Date", "Client Name", "Phone", "Location", "Sizing Specifications", "Notes", "Status"];
     const rows = leads.map(l => {
         const itemsStr = (l.items && l.items.length) 
-            ? l.items.map(it => `${it.name || 'Glass'} [Thick: ${it.thickness || 'Std'}, Edge: ${it.edgework || 'None'}, Size: ${it.width}"x${it.height}", Qty: ${it.qty}]`).join(" | ")
+            ? l.items.map(it => `${it.name || 'Product'}${it.glassProfile ? ` (${it.glassProfile})` : ''} [Thick: ${it.thickness || 'Std'}, Edge: ${it.edgework || 'None'}, Size: ${it.width}"x${it.height}", Qty: ${it.qty}]`).join(" | ")
             : "Custom Scope";
 
         return [
