@@ -348,6 +348,25 @@ function switchAuthMode(mode) {
     }
 }
 
+// Direct 1-Click Login for Owner
+function loginDirectAsOwner() {
+    playChimeSound("success");
+    const ownerUser = {
+        name: "Pratham Mehta",
+        username: "pratham_mehta",
+        mobile: "9812500455",
+        role: "Managing Director (Owner HQ)",
+        authType: "owner_direct",
+        email: OWNER_EMAIL
+    };
+    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
+    showToast("Welcome back, Pratham Mehta! Portal Unlocked.", "fa-crown");
+    checkAuthSession();
+}
+
 // ==========================================
 // 1. OWNER EMAIL ACCESS APPROVAL SYSTEM
 // ==========================================
@@ -379,7 +398,7 @@ async function handleSendApprovalRequestSubmit(e) {
     // Generate Unique Ticket Reference
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const ticketId = `AJANTA-APPR-${randomSuffix}`;
-    const approvalPin = "9070";
+    const approvalPin = "2601";
     const origin = window.location.href.split("?")[0];
     const approveUrl = `${origin}?approve_ticket=${ticketId}&action=approve&token=${randomSuffix}`;
 
@@ -408,22 +427,24 @@ async function handleSendApprovalRequestSubmit(e) {
 
     // 2. Dispatch Real Email to mehtapratham907@gmail.com
     try {
-        const formData = new FormData();
-        formData.append("_subject", `🚨 [ACTION REQUIRED] Ajanta Admin Access Approval Request: ${ticketId}`);
-        formData.append("Requester Name", name);
-        formData.append("Mobile Number", mobile);
-        formData.append("Access Purpose", purpose);
-        formData.append("Ticket ID", ticketId);
-        formData.append("Requested Time", new Date().toLocaleString());
-        formData.append("1-Click Approve URL", approveUrl);
-        formData.append("Approval Master PIN", approvalPin);
-        formData.append("_captcha", "false");
-        formData.append("_template", "table");
-
         fetch(`https://formsubmit.co/ajax/${OWNER_EMAIL}`, {
             method: "POST",
-            body: formData,
-            headers: { 'Accept': 'application/json' }
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                _subject: `🚨 [APPROVAL REQUIRED] Ajanta Admin Access: ${ticketId}`,
+                "Requester Name": name,
+                "Mobile Number": mobile,
+                "Access Purpose": purpose,
+                "Ticket ID": ticketId,
+                "Requested Time": new Date().toLocaleString(),
+                "1-Click Approve URL": approveUrl,
+                "Master Unlock PIN": approvalPin,
+                _template: "table",
+                _captcha: "false"
+            })
         }).catch(e => console.warn("Email dispatch note:", e));
     } catch (e) {
         console.warn("Email dispatch error:", e);
@@ -503,27 +524,23 @@ function startApprovalPolling(ticketId) {
 
 function grantAccessViaApproval(ticketData) {
     playChimeSound("alert");
-    const requester = ticketData?.requester || "Owner Approved User";
-    const authSession = {
-        authenticated: true,
-        user: {
-            name: requester,
-            username: "pratham_mehta",
-            role: "Owner Authorized Admin",
-            authType: "email_approval",
-            ticketId: ticketData?.id || "N/A"
-        },
-        token: `token-${Date.now()}`,
-        loginTime: new Date().toISOString()
+    const requester = ticketData?.requester || "Pratham Mehta";
+    const userObj = {
+        name: requester,
+        username: "pratham_mehta",
+        mobile: ticketData?.mobile || "9812500455",
+        role: "Owner Authorized Admin",
+        authType: "email_approval",
+        ticketId: ticketData?.id || "N/A"
     };
 
-    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(authSession));
+    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userObj));
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userObj));
     showToast(`Access Approved by Owner (${OWNER_EMAIL})!`, "fa-circle-check");
 
-    // Close waiting views and check auth session
-    setTimeout(() => {
-        checkAuthSession();
-    }, 400);
+    checkAuthSession();
 }
 
 // Instant 1-Click Owner Quick Approve Simulator / Tester
@@ -562,10 +579,10 @@ async function simulateOwnerApproveCurrentTicket() {
 
 function verifyApprovalQuickPin() {
     const pin = document.getElementById("approvalQuickPin")?.value?.trim();
-    if (pin === "9070" || pin === "1234" || (currentApprovalState.details && pin === currentApprovalState.details.pin)) {
+    if (pin === "2601" || (currentApprovalState.details && pin === currentApprovalState.details.pin)) {
         simulateOwnerApproveCurrentTicket();
     } else {
-        showToast("Invalid Owner Master PIN. Use 9070.", "fa-triangle-exclamation");
+        showToast("Invalid Owner Master PIN. Use 2601.", "fa-triangle-exclamation");
     }
 }
 
@@ -917,16 +934,18 @@ function handleVerifyOtpSubmit(e) {
 
 function getActiveUser() {
     try {
-        const stored = sessionStorage.getItem(STORAGE_KEYS.ACTIVE_USER);
+        const stored = sessionStorage.getItem(STORAGE_KEYS.ACTIVE_USER) || localStorage.getItem(STORAGE_KEYS.ACTIVE_USER);
         if (stored) return JSON.parse(stored);
     } catch (e) {
         console.warn("Active user read error:", e);
     }
-    return { name: "Sunny Mehta", mobile: "9876543210", username: "sunny" };
+    return { name: "Pratham Mehta", mobile: "9812500455", username: "pratham_mehta", role: "Managing Director" };
 }
 
 function checkAuthSession() {
-    const isLogged = sessionStorage.getItem(STORAGE_KEYS.SESSION) === "true";
+    const sessionVal = sessionStorage.getItem(STORAGE_KEYS.SESSION);
+    const localVal = localStorage.getItem(STORAGE_KEYS.SESSION);
+    const isLogged = sessionVal === "true" || localVal === "true" || (sessionVal && sessionVal.length > 0 && sessionVal !== "false") || (localVal && localVal.length > 0 && localVal !== "false");
     const loginScreen = document.getElementById("loginScreen");
     const dashboardApp = document.getElementById("dashboardApp");
 
@@ -937,15 +956,6 @@ function checkAuthSession() {
     } else {
         if (loginScreen) loginScreen.classList.remove("hidden");
         if (dashboardApp) dashboardApp.classList.add("hidden");
-        // Ensure all login and register inputs are completely clean and unpopulated
-        const loginUser = document.getElementById("loginUsername");
-        const loginPass = document.getElementById("loginPassword");
-        const regPass = document.getElementById("regPassword");
-        const regConf = document.getElementById("regConfirmPassword");
-        if (loginUser) loginUser.value = "";
-        if (loginPass) loginPass.value = "";
-        if (regPass) regPass.value = "";
-        if (regConf) regConf.value = "";
     }
 }
 
@@ -1115,6 +1125,8 @@ function toggleLoginPassword() {
 function handleLogout() {
     sessionStorage.removeItem(STORAGE_KEYS.SESSION);
     sessionStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
     showToast("Logged out securely", "fa-lock");
     checkAuthSession();
 }
