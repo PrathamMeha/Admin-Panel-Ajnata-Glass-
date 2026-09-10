@@ -67,21 +67,21 @@
             </div>
 
             <!-- Auth Mode Switch Tabs -->
-            <div class="grid grid-cols-4 bg-slate-950 p-1 rounded-2xl border border-slate-800 mb-6 gap-1">
-                <button type="button" onclick="switchAuthMode('approval')" id="authTab-approval" class="py-2 rounded-xl text-[10.5px] font-bold transition bg-amber-600 text-white shadow flex items-center justify-center gap-1">
-                    <i class="fa-solid fa-envelope-circle-check"></i>
-                    <span>Email Approval</span>
+            <div class="grid grid-cols-4 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 mb-6 gap-1.5">
+                <button type="button" onclick="switchAuthMode('approval')" id="authTab-approval" class="py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-envelope-circle-check text-xs"></i>
+                    <span>Approval</span>
                 </button>
-                <button type="button" onclick="switchAuthMode('otp')" id="authTab-otp" class="py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1">
-                    <i class="fa-solid fa-key"></i>
+                <button type="button" onclick="switchAuthMode('otp')" id="authTab-otp" class="py-2.5 px-1 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-key text-xs"></i>
                     <span>OTP Login</span>
                 </button>
-                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1">
-                    <i class="fa-solid fa-lock"></i>
+                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="py-2.5 px-1 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-lock text-xs"></i>
                     <span>Password</span>
                 </button>
-                <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="py-2 rounded-xl text-[10.5px] font-bold transition text-slate-400 hover:text-white flex items-center justify-center gap-1">
-                    <i class="fa-solid fa-user-plus"></i>
+                <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="py-2.5 px-1 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-user-plus text-xs"></i>
                     <span>Register</span>
                 </button>
             </div>
@@ -133,6 +133,17 @@
                     <i class="fa-solid fa-paper-plane"></i>
                     <span>Send Approval Request to Email</span>
                 </button>
+
+                <!-- Quick Master PIN Unlock on main view -->
+                <div class="pt-2 border-t border-slate-800/60 mt-3 flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-key"></i></span>
+                        <input type="password" id="approvalInitialPin" placeholder="Or enter Master PIN (2601)" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none placeholder-slate-600">
+                    </div>
+                    <button type="button" onclick="verifyMainApprovalPin()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition cursor-pointer whitespace-nowrap">
+                        Unlock
+                    </button>
+                </div>
             </form>
 
             <!-- 0.5. WAITING FOR EMAIL APPROVAL LIVE SCREEN -->
@@ -206,7 +217,7 @@
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">Username or Mobile Number</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-user"></i></span>
-                        <input type="text" id="loginUsername" required autocomplete="off" placeholder="Enter username or 10-digit mobile" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="text" id="loginUsername" required autocomplete="off" value="9812500455" placeholder="Enter username or 10-digit mobile" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                     </div>
                 </div>
 
@@ -214,7 +225,7 @@
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">Password</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-lock"></i></span>
-                        <input type="password" id="loginPassword" required autocomplete="new-password" placeholder="Enter your password" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="password" id="loginPassword" required autocomplete="new-password" value="2601" placeholder="Enter your password (2601)" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                         <button type="button" onclick="toggleLoginPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs">
                             <i id="loginPassIcon" class="fa-regular fa-eye"></i>
                         </button>
@@ -229,7 +240,7 @@
                 </button>
 
                 <div class="text-center pt-1">
-                    <button type="button" onclick="switchAuthMode('otp')" class="text-[11px] text-cyan-400 hover:text-cyan-300 transition font-semibold">
+                    <button type="button" onclick="switchAuthMode('otp')" class="text-[11px] text-cyan-400 hover:text-cyan-300 transition font-semibold cursor-pointer">
                         <i class="fa-solid fa-shield-halved mr-1"></i> Or Sign In using Random OTP
                     </button>
                 </div>
@@ -241,7 +252,7 @@
                     <i class="fa-solid fa-shield-cat text-cyan-400 text-base shrink-0 mt-0.5"></i>
                     <div>
                         <span class="font-bold text-white block">Random Secure OTP</span>
-                        <span>Enter your mobile/username. A randomized 6-digit verification code will be dispatched to your notifications instantly.</span>
+                        <span>Enter your mobile/username. A 6-digit verification code will be generated on screen instantly.</span>
                     </div>
                 </div>
 
@@ -249,7 +260,7 @@
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">Registered Mobile Number or Username *</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-mobile-screen"></i></span>
-                        <input type="text" id="otpMobileInput" required autocomplete="off" placeholder="e.g. 9876543210 or sunny" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="text" id="otpMobileInput" required autocomplete="off" value="9812500455" placeholder="e.g. 9812500455" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                     </div>
                 </div>
 
