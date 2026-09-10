@@ -14,8 +14,12 @@ const STORAGE_KEYS = {
     ACTIVE_USER: "ajanta_active_user",
     AUTH: "ajanta_admin_auth_config",
     SESSION: "ajanta_admin_logged_in",
+    SESSION_TIME: "ajanta_admin_logged_in_time",
     BROADCASTS: "ajanta_app_broadcasts_v1"
 };
+
+// 24 Hours Session Expiry in Milliseconds (24 * 60 * 60 * 1000)
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_USERS = [
     {
@@ -307,6 +311,7 @@ function switchAuthMode(mode) {
     const registerForm = document.getElementById("adminRegisterForm");
 
     const tabAppr = document.getElementById("authTab-approval");
+    const tabLogin = document.getElementById("authTab-login");
     const tabOtp = document.getElementById("authTab-otp");
     const tabRegister = document.getElementById("authTab-register");
 
@@ -333,6 +338,7 @@ function switchAuthMode(mode) {
     // Reset tab styling
     const inactiveStyle = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
     if (tabAppr) tabAppr.className = inactiveStyle;
+    if (tabLogin) tabLogin.className = inactiveStyle;
     if (tabOtp) tabOtp.className = inactiveStyle;
     if (tabRegister) tabRegister.className = inactiveStyle;
 
@@ -348,7 +354,7 @@ function switchAuthMode(mode) {
         if (oMob) setTimeout(() => oMob.focus(), 50);
     } else if (mode === "login" || mode === "password") {
         if (loginForm) loginForm.classList.remove("hidden");
-        if (tabOtp) tabOtp.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-cyan-700 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        if (tabLogin) tabLogin.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-cyan-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const lUser = document.getElementById("loginUsername");
         if (lUser) setTimeout(() => lUser.focus(), 50);
     } else if (mode === "waiting_approval") {
@@ -360,7 +366,7 @@ function switchAuthMode(mode) {
         const d1 = document.getElementById("otpDigit1");
         if (d1) setTimeout(() => d1.focus(), 100);
     } else {
-        // Default: Request Access
+        // Fallback / Request Access
         if (apprForm) apprForm.classList.remove("hidden");
         if (tabAppr) tabAppr.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const nameInp = document.getElementById("approvalRequesterName");
@@ -797,7 +803,7 @@ async function simulateOwnerApproveCurrentTicket() {
 
 function verifyApprovalQuickPin() {
     const pin = document.getElementById("approvalQuickPin")?.value?.trim();
-    if (pin === "2601" || pin === "9070" || (currentApprovalState.details && pin === currentApprovalState.details.pin)) {
+    if (pin === "2601" || pin === "0650" || pin === "9070" || (currentApprovalState.details && pin === currentApprovalState.details.pin)) {
         dismissPushBanner();
         simulateOwnerApproveCurrentTicket();
     } else {
@@ -807,7 +813,7 @@ function verifyApprovalQuickPin() {
 
 function verifyMainApprovalPin() {
     const pin = document.getElementById("approvalInitialPin")?.value?.trim();
-    if (pin === "2601" || pin === "9070") {
+    if (pin === "2601" || pin === "0650" || pin === "9070") {
         dismissPushBanner();
         // Master PIN unlocks directly as Owner
         loginDirectAsOwner();
@@ -1128,7 +1134,7 @@ function handleVerifyOtpSubmit(e) {
         if (digit) enteredCode += digit;
     }
 
-    const isMasterPin = enteredCode === "2601" || enteredCode === "260126" || enteredCode === "9070" || enteredCode.startsWith("2601");
+    const isMasterPin = enteredCode === "2601" || enteredCode === "0650" || enteredCode === "260126" || enteredCode === "9070" || enteredCode.startsWith("2601") || enteredCode.startsWith("0650");
 
     if (!isMasterPin && enteredCode.length !== 6) {
         showErr("Please enter the complete 6-digit OTP received on your email.");
@@ -1146,33 +1152,47 @@ function handleVerifyOtpSubmit(e) {
     }
 
     // Success: Authenticate user
-    const userToAuth = currentOtpState.user || {
+    let userToAuth = currentOtpState.user || {
         name: "Approved Admin Staff",
         username: "admin_staff",
-        role: "Authorized Staff"
+        role: "Staff Member"
     };
 
-    // If user was registered with pending approval, activate their account
-    try {
-        const users = getRegisteredUsers();
-        const matchIdx = users.findIndex(u =>
-            (u.email && u.email.toLowerCase() === (userToAuth.email || "").toLowerCase()) ||
-            (u.username && u.username.toLowerCase() === (userToAuth.username || "").toLowerCase())
-        );
-        if (matchIdx !== -1) {
-            users[matchIdx].status = "ACTIVE";
-            users[matchIdx].approvedAt = new Date().toISOString();
-            saveRegisteredUsers(users);
-            userToAuth.status = "ACTIVE";
+    if (currentOtpState.pendingNewUser) {
+        const newUser = currentOtpState.pendingNewUser;
+        newUser.role = "Staff Member"; // STRICT STAFF ONLY
+        newUser.isMasterUnlocked = false;
+
+        let users = getRegisteredUsers();
+        const existingIdx = users.findIndex(u => (u.username || "").toLowerCase() === newUser.username.toLowerCase());
+        if (existingIdx !== -1) {
+            users[existingIdx] = newUser;
+        } else {
+            users.push(newUser);
         }
-    } catch (err) {
-        console.warn("User status activation note:", err);
+        saveRegisteredUsers(users);
+        userToAuth = newUser;
+        showToast(`Account registered & verified! Welcome, ${newUser.name}!`, "fa-user-check");
+    } else {
+        // If user was registered with pending approval, activate their account
+        try {
+            const users = getRegisteredUsers();
+            const matchIdx = users.findIndex(u =>
+                (u.email && u.email.toLowerCase() === (userToAuth.email || "").toLowerCase()) ||
+                (u.username && u.username.toLowerCase() === (userToAuth.username || "").toLowerCase())
+            );
+            if (matchIdx !== -1) {
+                users[matchIdx].status = "ACTIVE";
+                users[matchIdx].approvedAt = new Date().toISOString();
+                saveRegisteredUsers(users);
+                userToAuth.status = "ACTIVE";
+            }
+        } catch (err) {
+            console.warn("User status activation note:", err);
+        }
     }
 
-    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userToAuth));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userToAuth));
+    setLoginSession(userToAuth);
 
     if (errBox) errBox.classList.add("hidden");
     dismissPushBanner();
@@ -1190,10 +1210,42 @@ function getActiveUser() {
     return { name: "Pratham Mehta", mobile: "9812500455", username: "pratham_mehta", role: "Managing Director" };
 }
 
+function setLoginSession(user) {
+    const now = Date.now();
+    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    localStorage.setItem(STORAGE_KEYS.SESSION_TIME, String(now));
+    sessionStorage.setItem(STORAGE_KEYS.SESSION_TIME, String(now));
+    if (user) {
+        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(user));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(user));
+    }
+}
+
 function checkAuthSession() {
     const sessionVal = sessionStorage.getItem(STORAGE_KEYS.SESSION);
     const localVal = localStorage.getItem(STORAGE_KEYS.SESSION);
-    const isLogged = sessionVal === "true" || localVal === "true" || (sessionVal && sessionVal.length > 0 && sessionVal !== "false") || (localVal && localVal.length > 0 && localVal !== "false");
+    const hasFlag = sessionVal === "true" || localVal === "true" || (sessionVal && sessionVal.length > 0 && sessionVal !== "false") || (localVal && localVal.length > 0 && localVal !== "false");
+    
+    // Check 24-hour expiration window
+    let isExpired = false;
+    const loginTimeStr = localStorage.getItem(STORAGE_KEYS.SESSION_TIME) || sessionStorage.getItem(STORAGE_KEYS.SESSION_TIME);
+    if (loginTimeStr) {
+        const loginTimestamp = parseInt(loginTimeStr, 10);
+        if (!isNaN(loginTimestamp) && (Date.now() - loginTimestamp > SESSION_DURATION_MS)) {
+            isExpired = true;
+        }
+    }
+
+    // If 24 hours elapsed, expire session and ask for password again
+    if (isExpired) {
+        sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+        sessionStorage.removeItem(STORAGE_KEYS.SESSION_TIME);
+        localStorage.removeItem(STORAGE_KEYS.SESSION);
+        localStorage.removeItem(STORAGE_KEYS.SESSION_TIME);
+    }
+
+    const isLogged = hasFlag && !isExpired;
     const loginScreen = document.getElementById("loginScreen");
     const dashboardApp = document.getElementById("dashboardApp");
 
@@ -1213,6 +1265,10 @@ function checkAuthSession() {
     } else {
         if (loginScreen) loginScreen.classList.remove("hidden");
         if (dashboardApp) dashboardApp.classList.add("hidden");
+        if (isExpired) {
+            showToast("24 hours session completed. Please enter your password to continue.", "fa-lock");
+            switchAuthMode("login");
+        }
     }
 }
 
@@ -1240,11 +1296,11 @@ async function handleRegisterSubmit(e) {
     }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showRegError("Please enter a valid email address (your 6-digit OTP will be sent here upon approval).");
+        showRegError("Please enter a valid email address.");
         return;
     }
 
-    // Clean mobile number (strip any spaces or special characters)
+    // Clean mobile number
     const cleanMobile = mobileRaw.replace(/[^0-9]/g, "");
     if (cleanMobile.length !== 10) {
         showRegError("Please enter a valid 10-digit mobile number.");
@@ -1253,6 +1309,12 @@ async function handleRegisterSubmit(e) {
 
     if (username.length < 3) {
         showRegError("Username must be at least 3 characters long.");
+        return;
+    }
+
+    // Block registering reserved Owner usernames
+    if (username.toLowerCase() === "pratham_mehta" || username.toLowerCase() === "admin") {
+        showRegError("Reserved username. Please choose a different staff username.");
         return;
     }
 
@@ -1268,7 +1330,17 @@ async function handleRegisterSubmit(e) {
 
     const users = getRegisteredUsers();
 
-    // Check if email or username or mobile already exists in registered database
+    // Check if permanently disabled by Owner
+    const isBlocked = users.some(u => (u.status === "BLOCKED" || u.status === "PERMANENTLY_DISABLED") && (
+        (u.email && u.email.toLowerCase() === email.toLowerCase()) ||
+        (u.mobile && u.mobile.replace(/[^0-9]/g, "") === cleanMobile) ||
+        (u.username && u.username.toLowerCase() === username.toLowerCase())
+    ));
+    if (isBlocked) {
+        showRegError("This account or mobile number has been permanently disabled by Owner.");
+        return;
+    }
+
     const existingUser = users.find(u =>
         (u.username || "").toLowerCase() === username.toLowerCase() && u.id !== "usr-sunny"
     );
@@ -1285,17 +1357,14 @@ async function handleRegisterSubmit(e) {
 
     if (regBtn) {
         regBtn.disabled = true;
-        regBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Submitting &amp; Dispatching to Owner...`;
+        regBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Generating 6-Digit Verification OTP...`;
     }
 
-    // Generate Unique Ticket Reference for Owner Approval
-    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
-    const ticketId = `AJANTA-REG-${randomSuffix}`;
-    const approvalPin = "2601";
-    const origin = window.location.href.split("?")[0];
-    const approveUrl = `${origin}?approve_ticket=${ticketId}&action=approve&token=${randomSuffix}`;
+    // Strictly new staff user template - CANNOT BE MASTER HQ
+    const designation = document.getElementById("regDesignation")?.value || "Staff Member";
+    let defaultModule = "products";
+    if (designation === "Sales Executive") defaultModule = "leads";
 
-    // Create new user with PENDING_APPROVAL status
     const newUser = {
         id: `usr-${Date.now()}`,
         name: name,
@@ -1303,163 +1372,93 @@ async function handleRegisterSubmit(e) {
         mobile: cleanMobile,
         username: username,
         password: password,
-        status: "PENDING_APPROVAL",
-        ticketId: ticketId,
+        designation: designation,
+        role: designation === "Manager" ? "Manager" : "Staff Member", // STRICT NON-OWNER
+        allowedTab: defaultModule,
+        status: "ACTIVE",
         createdAt: new Date().toISOString()
     };
 
-    if (existingMobIdx !== -1 && users[existingMobIdx].id === "usr-sunny") {
-        users[existingMobIdx] = newUser;
-    } else {
-        users.push(newUser);
-    }
-    saveRegisteredUsers(users);
-
-    const ticketData = {
-        id: ticketId,
-        status: "PENDING",
-        requester: name,
+    // Generate 6-Digit Email OTP for registration verification
+    const otpCode = generateSecureRandomOtp();
+    currentOtpState = {
+        code: otpCode,
         email: email,
-        mobile: cleanMobile,
-        username: username,
-        purpose: "New Staff Account Registration",
-        targetEmail: OWNER_EMAIL,
-        pin: approvalPin,
-        approveUrl: approveUrl,
-        requestedAt: new Date().toISOString()
+        user: newUser,
+        pendingNewUser: newUser,
+        targetDisplay: email,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        cooldown: 59,
+        timerId: null
     };
 
-    // 1. Post to KVDB Cloud for real-time synchronization
+    // 1. Dispatch Email to User
     try {
-        await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(ticketData)
-        });
-    } catch (err) {
-        console.warn("Cloud ticket creation note:", err);
-    }
-
-    // 2. Dispatch Email to Owner via hidden form
-    try {
-        const hForm = document.getElementById("hiddenEmailForm");
+        const hForm = document.getElementById("hiddenUserOtpForm");
         if (hForm) {
-            const subjEl = document.getElementById("hiddenFormSubject");
-            const nameEl = document.getElementById("hiddenFormName");
-            const emailEl = document.getElementById("hiddenFormEmail");
-            const mobEl = document.getElementById("hiddenFormMobile");
-            const purpEl = document.getElementById("hiddenFormPurpose");
-            const tickEl = document.getElementById("hiddenFormTicket");
-            const urlEl = document.getElementById("hiddenFormApproveUrl");
+            const subjEl = document.getElementById("hiddenUserOtpSubject");
+            const nameEl = document.getElementById("hiddenUserOtpName");
+            const codeEl = document.getElementById("hiddenUserOtpCode");
+            const tickEl = document.getElementById("hiddenUserOtpTicket");
 
-            if (subjEl) subjEl.value = `🚨 [NEW REGISTRATION APPROVAL] ${name} (${username}) - ${ticketId}`;
+            if (subjEl) subjEl.value = `🔑 Ajanta Staff Registration Verification Code: ${otpCode}`;
             if (nameEl) nameEl.value = name;
-            if (emailEl) emailEl.value = email;
-            if (mobEl) mobEl.value = cleanMobile;
-            if (purpEl) purpEl.value = "New Staff Registration";
-            if (tickEl) tickEl.value = ticketId;
-            if (urlEl) urlEl.value = approveUrl;
+            if (codeEl) codeEl.value = otpCode;
+            if (tickEl) tickEl.value = `REG-${Math.floor(10000 + Math.random() * 90000)}`;
 
+            hForm.action = `https://formsubmit.co/${email}`;
             hForm.submit();
         }
     } catch (e) {
-        console.warn("Hidden form email submit error:", e);
+        console.warn("User OTP email dispatch note:", e);
     }
 
-    // Also attempt AJAX dispatch
+    // 2. Dispatch via FormSubmit AJAX gateway
     try {
-        fetch(`https://formsubmit.co/ajax/${OWNER_EMAIL}`, {
+        fetch(`https://formsubmit.co/ajax/${email}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             },
             body: JSON.stringify({
-                _subject: `🚨 [NEW REGISTRATION APPROVAL] ${name} (${username}) - ${ticketId}`,
-                "Full Name": name,
-                "User Email": email,
-                "Mobile Number": cleanMobile,
-                "Requested Username": username,
-                "Ticket ID": ticketId,
-                "Requested Time": new Date().toLocaleString(),
-                "1-Click Approve URL": approveUrl,
+                _subject: `🔑 Ajanta Registration Verification OTP: ${otpCode}`,
+                "Staff Name": name,
+                "Verification OTP Code": otpCode,
+                "Instructions": "Enter this 6-digit verification code to complete staff account registration.",
                 _template: "table",
                 _captcha: "false"
             })
-        }).catch(e => console.warn("Email dispatch note:", e));
-    } catch (e) {
-        console.warn("Email dispatch error:", e);
-    }
+        }).catch(e => console.warn("FormSubmit OTP note:", e));
+    } catch (e) {}
 
-    // Update Direct Mailto link for Gmail / native Mail apps
-    try {
-        const mailtoLink = document.getElementById("waitingMailtoLink");
-        if (mailtoLink) {
-            const mailSubject = encodeURIComponent(`[REGISTRATION APPROVAL] Ajanta Admin: ${name} (${ticketId})`);
-            const mailBody = encodeURIComponent(
-                `Hi Pratham,\n\nA new staff member registered for Ajanta Admin access:\n\n` +
-                `Name: ${name}\n` +
-                `Email: ${email}\n` +
-                `Mobile: ${cleanMobile}\n` +
-                `Username: ${username}\n` +
-                `Ticket ID: ${ticketId}\n\n` +
-                `Click below to approve & send 6-digit OTP code to ${email}:\n${approveUrl}\n\n` +
-                `Or use Security PIN: 2601\n`
-            );
-            mailtoLink.href = `mailto:${OWNER_EMAIL}?subject=${mailSubject}&body=${mailBody}`;
-        }
-    } catch (e) {
-        console.warn("Mailto setup note:", e);
-    }
+    // Show Push Notification Banner with Auto-Fill OTP
+    showPushNotificationBanner(
+        `Registration Verification Code Sent!`,
+        `6-digit OTP dispatched to <strong>${email}</strong>. Code: <strong class="font-mono text-amber-300 text-sm tracking-widest bg-slate-950 px-1.5 py-0.5 rounded">${otpCode}</strong>`,
+        otpCode
+    );
 
     if (regBtn) {
         regBtn.disabled = false;
-        regBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Register &amp; Request Approval</span>`;
+        regBtn.innerHTML = `<i class="fa-solid fa-user-plus"></i> <span>Create Account</span>`;
+    }
+
+    const targetDispEl = document.getElementById("otpTargetDisplay");
+    if (targetDispEl) targetDispEl.textContent = email;
+
+    // Clear digit input boxes
+    for (let i = 1; i <= 6; i++) {
+        const d = document.getElementById(`otpDigit${i}`);
+        if (d) d.value = "";
     }
 
     if (errBox) errBox.classList.add("hidden");
 
-    // Set local state
-    currentApprovalState = {
-        ticketId: ticketId,
-        pollTimer: null,
-        details: ticketData,
-        pollCounter: 0
-    };
-
-    // Update UI elements
-    const waitTicketEl = document.getElementById("waitingTicketId");
-    if (waitTicketEl) waitTicketEl.textContent = ticketId;
-    const waitEmailEl = document.getElementById("waitingTargetEmail");
-    if (waitEmailEl) waitEmailEl.textContent = email;
-
-    switchAuthMode("waiting_approval");
-
-    // Notification banner for Owner quick review
-    triggerSystemPushBanner({
-        title: "Registration Request Dispatched to Owner",
-        body: `Account request for <strong>${name}</strong> (<span class="font-mono text-amber-300">${ticketId}</span>) sent to <strong class="text-amber-300">${OWNER_EMAIL}</strong>.`,
-        icon: "fa-envelope-circle-check",
-        actions: [
-            {
-                html: `<i class="fa-solid fa-check text-[10px]"></i> Quick Approve (Owner)`,
-                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
-                onClick: () => {
-                    dismissPushBanner();
-                    simulateOwnerApproveCurrentTicket();
-                }
-            },
-            {
-                html: `<i class="fa-solid fa-xmark text-[10px]"></i> Dismiss`,
-                className: "bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1",
-                onClick: () => dismissPushBanner()
-            }
-        ],
-        sound: true
-    });
-
-    startApprovalPolling(ticketId);
-    showToast(`Account registered! Approval request dispatched to ${OWNER_EMAIL}.`, "fa-paper-plane");
+    // Transition to OTP verification screen!
+    switchAuthMode("verify_otp");
+    startOtpCountdown();
+    showToast(`6-Digit Verification OTP sent to ${email}`, "fa-paper-plane");
 }
 
 async function handleLoginSubmit(e) {
@@ -1481,7 +1480,7 @@ async function handleLoginSubmit(e) {
     }
 
     // Owner Master PIN Bypass check
-    if (passIn === "2601" || ((identifier === "admin" || identifier === "9812500455" || identifier === "pratham_mehta") && (passIn === "admin" || passIn === "admin123" || passIn === "2601"))) {
+    if (passIn === "2601" || passIn === "0650" || ((identifier === "admin" || identifier === "9812500455" || identifier === "pratham_mehta") && (passIn === "admin" || passIn === "admin123" || passIn === "2601" || passIn === "0650"))) {
         loginDirectAsOwner();
         return;
     }
@@ -1509,6 +1508,11 @@ async function handleLoginSubmit(e) {
     }
 
     if (matchedUser) {
+        if (matchedUser.status === "BLOCKED" || matchedUser.status === "PERMANENTLY_DISABLED") {
+            showLogErr("Your account has been permanently disabled by Owner.");
+            return;
+        }
+
         // If account is pending approval, redirect to waiting view & resume polling
         if (matchedUser.status === "PENDING_APPROVAL") {
             const ticketId = matchedUser.ticketId || `AJANTA-REG-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -1535,10 +1539,7 @@ async function handleLoginSubmit(e) {
             return;
         }
 
-        sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-        localStorage.setItem(STORAGE_KEYS.SESSION, "true");
-        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
+        setLoginSession(matchedUser);
         if (errBox) errBox.classList.add("hidden");
         showToast(`Welcome back, ${matchedUser.name}!`, "fa-circle-check");
         checkAuthSession();
@@ -1557,10 +1558,7 @@ function loginDirectAsOwner() {
         authType: "master_pin_verified",
         email: OWNER_EMAIL
     };
-    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
+    setLoginSession(ownerUser);
     const errBox = document.getElementById("loginError");
     if (errBox) errBox.classList.add("hidden");
     dismissPushBanner();
@@ -1583,8 +1581,10 @@ function toggleLoginPassword() {
 
 function handleLogout() {
     sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+    sessionStorage.removeItem(STORAGE_KEYS.SESSION_TIME);
     sessionStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
     localStorage.removeItem(STORAGE_KEYS.SESSION);
+    localStorage.removeItem(STORAGE_KEYS.SESSION_TIME);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
     showToast("Logged out securely", "fa-lock");
     checkAuthSession();
@@ -1607,6 +1607,7 @@ function saveNewCredentials(e) {
         saveRegisteredUsers(users);
         activeUser.password = newPass;
         sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
         showToast("Password updated successfully", "fa-key");
     }
 }
@@ -1654,12 +1655,19 @@ function initDashboard() {
     renderLeadsTable();
     renderReviewsGrid();
     renderBroadcastsList();
+    renderBandsTable();
     pullProductsFromCloud();
     pullBroadcastsFromCloud();
 }
 
 function switchTab(tabId) {
     currentTab = tabId;
+    const activeUser = getActiveUser();
+    const isMaster = activeUser.isMasterUnlocked || activeUser.role === "Managing Director (Owner HQ)" || activeUser.role === "Master HQ";
+    const userAllowedModule = activeUser.allowedTab || "products"; // Default allowed module for staff
+
+    // Check if the requested tab is restricted for this staff user
+    const isRestricted = !isMaster && (userAllowedModule !== "ALL" && userAllowedModule !== tabId);
     
     // Update navigation buttons
     document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -1669,6 +1677,8 @@ function switchTab(tabId) {
     if (activeNav) {
         if (tabId === "broadcasts") {
             activeNav.className = "tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-amber-600 text-white shadow-lg shadow-amber-950/40 cursor-pointer";
+        } else if (tabId === "bands") {
+            activeNav.className = "tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-emerald-600 text-white shadow-lg shadow-emerald-950/40 cursor-pointer";
         } else {
             activeNav.className = "tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-950/40 cursor-pointer";
         }
@@ -1677,10 +1687,41 @@ function switchTab(tabId) {
     // Update Panes
     document.querySelectorAll(".tab-pane").forEach(pane => pane.classList.add("hidden"));
     const activePane = document.getElementById(`tabContent-${tabId}`);
-    if (activePane) activePane.classList.remove("hidden");
+    if (activePane) {
+        activePane.classList.remove("hidden");
 
-    if (tabId === "broadcasts") {
-        renderBroadcastsList();
+        // Handle Restricted Access Banner overlay for non-unlocked modules
+        const existingBanner = document.getElementById(`restrictedTabOverlay-${tabId}`);
+        if (isRestricted) {
+            if (!existingBanner) {
+                const overlay = document.createElement("div");
+                overlay.id = `restrictedTabOverlay-${tabId}`;
+                overlay.className = "mb-6 p-6 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-amber-950/80 border border-amber-500/40 text-center shadow-xl";
+                overlay.innerHTML = `
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 text-xl mb-3 border border-amber-500/40">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="text-white font-black text-base">Module Access Restricted</h3>
+                    <p class="text-slate-300 text-xs mt-1 max-w-lg mx-auto">
+                        Your account is currently authorized for <strong>${userAllowedModule.toUpperCase()}</strong> module access only.
+                    </p>
+                    <button onclick="openMasterPinModal()" class="mt-3 bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-white text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer shadow-lg shadow-amber-950/50">
+                        <i class="fa-solid fa-key mr-1.5"></i> Unlock Owner Master Security PIN
+                    </button>
+                `;
+                activePane.prepend(overlay);
+            }
+        } else {
+            if (existingBanner) existingBanner.remove();
+        }
+    }
+
+    if (!isRestricted) {
+        if (tabId === "broadcasts") {
+            renderBroadcastsList();
+        } else if (tabId === "bands") {
+            renderBandsTable();
+        }
     }
 
     updateBadgesAndStats();
@@ -1691,17 +1732,20 @@ function updateBadgesAndStats() {
     const leads = getStoredLeads();
     const reviews = getStoredReviews();
     const broadcasts = getBroadcasts();
+    const registered = getRegisteredUsers();
 
     const bProd = document.getElementById("badgeCountProducts");
     const bLeads = document.getElementById("badgeCountLeads");
     const bRev = document.getElementById("badgeCountReviews");
     const bBcast = document.getElementById("badgeCountBroadcasts");
+    const bBands = document.getElementById("badgeCountBands");
     const activeBcCount = document.getElementById("activeBcCount");
 
     if (bProd) bProd.textContent = products.length;
     if (bLeads) bLeads.textContent = leads.length;
     if (bRev) bRev.textContent = reviews.length;
     if (bBcast) bBcast.textContent = broadcasts.length;
+    if (bBands) bBands.textContent = registered.length;
     if (activeBcCount) activeBcCount.textContent = broadcasts.length;
 
     const sProd = document.getElementById("statBoxProducts");
@@ -3078,6 +3122,14 @@ document.addEventListener("DOMContentLoaded", () => {
     checkOwnerApprovalUrlQuery();
     checkAuthSession();
 
+    // Default to Sign In tab if not logged in
+    const sessionVal = sessionStorage.getItem(STORAGE_KEYS.SESSION);
+    const localVal = localStorage.getItem(STORAGE_KEYS.SESSION);
+    const isLogged = sessionVal === "true" || localVal === "true" || (sessionVal && sessionVal.length > 0 && sessionVal !== "false") || (localVal && localVal.length > 0 && localVal !== "false");
+    if (!isLogged) {
+        switchAuthMode("login");
+    }
+
     // Bind tab clicks explicitly
     document.getElementById("authTab-approval")?.addEventListener("click", () => switchAuthMode("approval"));
     document.getElementById("authTab-otp")?.addEventListener("click", () => switchAuthMode("otp"));
@@ -3147,6 +3199,332 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+// ==========================================================
+// MASTER SECURITY PIN UNLOCK & STAFF/BAND ACCESS CONTROL
+// ==========================================================
+
+let activeBandFilter = "ALL";
+
+function openMasterPinModal() {
+    const modal = document.getElementById("masterPinUnlockModal");
+    const err = document.getElementById("masterPinModalError");
+    const input = document.getElementById("modalMasterPinInput");
+    if (err) err.classList.add("hidden");
+    if (input) input.value = "";
+    if (modal) modal.classList.remove("hidden");
+    if (input) setTimeout(() => input.focus(), 100);
+}
+
+function closeMasterPinModal() {
+    const modal = document.getElementById("masterPinUnlockModal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function verifyMasterPinUnlock() {
+    const pin = document.getElementById("modalMasterPinInput")?.value?.trim();
+    const errBox = document.getElementById("masterPinModalError");
+
+    if (pin === "2601" || pin === "0650" || pin === "9070") {
+        const activeUser = getActiveUser();
+        activeUser.role = "Managing Director (Owner HQ)";
+        activeUser.isMasterUnlocked = true;
+        
+        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+
+        const badgeText = document.getElementById("headerMasterPinBadgeText");
+        const btn = document.getElementById("unlockMasterPinHeaderBtn");
+        if (badgeText) badgeText.textContent = "Master Access Unlocked";
+        if (btn) {
+            btn.className = "bg-gradient-to-r from-amber-600 to-yellow-500 text-white border border-yellow-400/80 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-950/60";
+        }
+
+        closeMasterPinModal();
+        showToast("Master Access Unlocked! Full Owner Rights Granted.", "fa-crown");
+        renderBandsTable();
+        
+        // Remove restricted overlays
+        document.querySelectorAll("[id^='restrictedTabOverlay-']").forEach(el => el.remove());
+    } else {
+        if (errBox) {
+            errBox.textContent = "Invalid Owner Security PIN (2601 / 0650). Access denied.";
+            errBox.classList.remove("hidden");
+        }
+    }
+}
+
+function isPrimaryOwnerSession() {
+    const activeUser = getActiveUser();
+    return activeUser.username === "pratham_mehta" ||
+        activeUser.id === "usr-owner-pratham" ||
+        (activeUser.email && activeUser.email.toLowerCase() === OWNER_EMAIL && activeUser.name && activeUser.name.toLowerCase().includes("pratham"));
+}
+
+function ensureMasterPinUnlocked() {
+    const activeUser = getActiveUser();
+    const isOwnerSession = activeUser.isMasterUnlocked ||
+        activeUser.role === "Managing Director (Owner HQ)" ||
+        activeUser.role === "Master HQ" ||
+        isPrimaryOwnerSession();
+
+    if (!isOwnerSession) {
+        showToast("🔑 Owner Security PIN (2601 / 0650) required for this action.", "fa-lock");
+        openMasterPinModal();
+        return false;
+    }
+    return true;
+}
+
+function ensureMasterOwnerAuthority() {
+    if (!isPrimaryOwnerSession()) {
+        showToast("⛔ Access Denied! Only Primary Owner Pratham Mehta can modify user roles or delete accounts.", "fa-shield-halved");
+        return false;
+    }
+    return ensureMasterPinUnlocked();
+}
+
+function setBandFilter(filter) {
+    activeBandFilter = filter;
+    ["ALL", "ACTIVE", "BLOCKED"].forEach(f => {
+        const btn = document.getElementById(`bandFilter-${f}`);
+        if (btn) {
+            if (f === filter) {
+                btn.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white cursor-pointer";
+            } else {
+                btn.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-400 hover:text-white cursor-pointer";
+            }
+        }
+    });
+    renderBandsTable();
+}
+
+function renderBandsTable() {
+    const tableBody = document.getElementById("bandsTableBody");
+    if (!tableBody) return;
+
+    const query = (document.getElementById("bandSearchInput")?.value || "").toLowerCase().trim();
+    let users = getRegisteredUsers();
+
+    // Default system owner entry if not present
+    const hasOwner = users.some(u => u.username === "pratham_mehta" || u.id === "usr-owner-pratham");
+    if (!hasOwner) {
+        users.unshift({
+            id: "usr-owner-pratham",
+            name: "Pratham Mehta",
+            username: "pratham_mehta",
+            email: OWNER_EMAIL,
+            mobile: "9812500455",
+            role: "Managing Director (Owner HQ)",
+            status: "ACTIVE",
+            allowedTab: "ALL",
+            bandInfo: "Master Headquarters Band",
+            lastLogin: new Date().toLocaleDateString()
+        });
+    }
+
+    // Filter
+    let filtered = users.filter(u => {
+        if (activeBandFilter === "ACTIVE" && u.status !== "ACTIVE") return false;
+        if (activeBandFilter === "BLOCKED" && u.status !== "BLOCKED" && u.status !== "PERMANENTLY_DISABLED") return false;
+
+        if (!query) return true;
+        const nameStr = (u.name || "").toLowerCase();
+        const emailStr = (u.email || "").toLowerCase();
+        const mobStr = (u.mobile || "").toLowerCase();
+        const userStr = (u.username || "").toLowerCase();
+        const bandStr = (u.bandInfo || "").toLowerCase();
+        return nameStr.includes(query) || emailStr.includes(query) || mobStr.includes(query) || userStr.includes(query) || bandStr.includes(query);
+    });
+
+    if (filtered.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="p-8 text-center text-slate-500 text-xs">
+                    <i class="fa-solid fa-users-slash text-2xl mb-2 block opacity-40"></i>
+                    No staff members or bands found matching your criteria.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const currentActiveUser = getActiveUser();
+    const viewerIsPrimaryOwner = isPrimaryOwnerSession();
+
+    tableBody.innerHTML = filtered.map(u => {
+        // Strictly Primary Owner check (Pratham Mehta only)
+        const isOwner = u.username === "pratham_mehta" ||
+            u.id === "usr-owner-pratham" ||
+            (u.name && u.name.toLowerCase().includes("pratham") && u.email && u.email.toLowerCase() === OWNER_EMAIL);
+        
+        const isBlocked = u.status === "BLOCKED" || u.status === "PERMANENTLY_DISABLED";
+        const isCurrentSession = (currentActiveUser.username && currentActiveUser.username === u.username) || (currentActiveUser.email && currentActiveUser.email.toLowerCase() === (u.email || "").toLowerCase() && currentActiveUser.username === u.username);
+
+        const statusBadge = isBlocked
+            ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-950 text-rose-400 border border-rose-800/40"><i class="fa-solid fa-ban mr-1"></i> Blocked / Disabled</span>`
+            : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800/40"><i class="fa-solid fa-circle text-[6px] mr-1"></i> Active Session</span>`;
+
+        const bandDisplay = u.bandInfo || (isOwner ? "Owner Chrome / Web Band" : "Ajanta App / Staff Web Band");
+
+        return `
+            <tr class="hover:bg-slate-900/50 transition">
+                <td class="p-3">
+                    <div class="font-bold text-white flex items-center gap-2">
+                        <span>${u.name || "Staff Member"}</span>
+                        ${isCurrentSession ? `<span class="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-800/40 px-1.5 py-0.5 rounded-md font-mono">You</span>` : ""}
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono">@${u.username || "staff"}</div>
+                    ${u.designation ? `
+                        <div class="text-[10px] text-cyan-400 font-semibold mt-0.5 flex items-center gap-1">
+                            <i class="fa-solid fa-briefcase text-[9px]"></i>
+                            <span>${u.designation}</span>
+                        </div>
+                    ` : ""}
+                </td>
+                <td class="p-3">
+                    <div class="text-xs text-slate-300 font-medium">${u.email || "—"}</div>
+                    <div class="text-[10px] text-slate-400 font-mono">+91 ${u.mobile || "—"}</div>
+                </td>
+                <td class="p-3">
+                    <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-laptop text-cyan-400 text-[10px]"></i>
+                        <span>${bandDisplay}</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500">Last login: ${u.lastLogin || "Today"}</div>
+                </td>
+                <td class="p-3">
+                    ${isOwner ? `
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40 shadow-sm"><i class="fa-solid fa-crown mr-1 text-amber-400"></i> Primary Master HQ</span>
+                    ` : `
+                        <div class="flex flex-col gap-1">
+                            <select ${viewerIsPrimaryOwner ? "" : "disabled"} onchange="changeUserRole('${u.id || u.username}', this.value)" class="bg-slate-950 border border-slate-800 text-[11px] rounded-lg px-2 py-0.5 text-slate-200 font-semibold focus:outline-none focus:border-cyan-500 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                                <option value="Staff Member" ${(u.role === "Staff Member" || !u.role) ? "selected" : ""}>👤 Staff Member</option>
+                                <option value="Manager" ${u.role === "Manager" ? "selected" : ""}>👔 Manager</option>
+                                <option value="Master HQ" ${(u.role === "Master HQ" || u.role === "Managing Director (Owner HQ)") ? "selected" : ""}>👑 Master HQ</option>
+                            </select>
+                            <select ${viewerIsPrimaryOwner ? "" : "disabled"} onchange="changeUserModule('${u.id || u.username}', this.value)" class="bg-slate-950 border border-slate-800 text-[10px] rounded-lg px-1.5 py-0.5 text-cyan-300 font-medium focus:outline-none focus:border-cyan-500 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed" title="Unlocked Module Scope">
+                                <option value="products" ${(u.allowedTab === "products" || !u.allowedTab) ? "selected" : ""}>📦 Product & Price Only</option>
+                                <option value="leads" ${u.allowedTab === "leads" ? "selected" : ""}>📋 Leads & Quotes Only</option>
+                                <option value="broadcasts" ${u.allowedTab === "broadcasts" ? "selected" : ""}>🚨 Emergency Only</option>
+                                <option value="bands" ${u.allowedTab === "bands" ? "selected" : ""}>👥 Staff & Bands Only</option>
+                                <option value="ALL" ${u.allowedTab === "ALL" ? "selected" : ""}>🔓 Unlock All Modules</option>
+                            </select>
+                        </div>
+                    `}
+                </td>
+                <td class="p-3">${statusBadge}</td>
+                <td class="p-3 text-right">
+                    ${isOwner ? `
+                        <span class="text-[10px] text-amber-400 font-bold italic border border-amber-500/30 bg-amber-950/40 px-2.5 py-1.5 rounded-lg inline-flex items-center gap-1 shadow">
+                            <i class="fa-solid fa-shield-halved text-amber-400"></i> Owner Protected
+                        </span>
+                    ` : viewerIsPrimaryOwner ? `
+                        <div class="flex items-center justify-end gap-1.5">
+                            <button onclick="revokeStaffSession('${u.id || u.username}')" class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-semibold px-2 py-1.5 rounded-lg border border-slate-700 transition cursor-pointer flex items-center gap-1" title="Log out session">
+                                <i class="fa-solid fa-right-from-bracket text-[10px]"></i>
+                                <span>Revoke</span>
+                            </button>
+                            ${isBlocked ? `
+                                <button onclick="reenableStaffAccount('${u.id || u.username}')" class="bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 text-[11px] font-bold px-2 py-1.5 rounded-lg border border-emerald-800/40 transition cursor-pointer flex items-center gap-1">
+                                    <i class="fa-solid fa-user-check text-[10px]"></i>
+                                    <span>Unblock</span>
+                                </button>
+                            ` : `
+                                <button onclick="permanentlyDisableStaffAccount('${u.id || u.username}')" class="bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-[11px] font-bold px-2 py-1.5 rounded-lg border border-rose-800/40 transition cursor-pointer flex items-center gap-1">
+                                    <i class="fa-solid fa-ban text-[10px]"></i>
+                                    <span>Disable</span>
+                                </button>
+                            `}
+                            <button onclick="deleteStaffAccount('${u.id || u.username}')" class="bg-rose-950 hover:bg-rose-900 text-rose-200 text-[11px] font-bold px-2 py-1.5 rounded-lg border border-rose-800/60 transition cursor-pointer flex items-center gap-1" title="Delete account permanently">
+                                <i class="fa-solid fa-trash-can text-[10px]"></i>
+                                <span>Delete</span>
+                            </button>
+                        </div>
+                    ` : `
+                        <span class="text-[10px] text-slate-500 italic"><i class="fa-solid fa-lock text-[9px] mr-1"></i> Owner Restricted</span>
+                    `}
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function revokeStaffSession(userId) {
+    if (!ensureMasterOwnerAuthority()) return;
+    const users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    if (idx !== -1) {
+        showToast(`Session revoked for ${users[idx].name}. Forces re-authentication.`, "fa-right-from-bracket");
+    } else {
+        showToast("Staff session revoked.", "fa-check");
+    }
+}
+
+function permanentlyDisableStaffAccount(userId) {
+    if (!ensureMasterOwnerAuthority()) return;
+    let users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    if (idx !== -1) {
+        users[idx].status = "BLOCKED";
+        saveRegisteredUsers(users);
+        showToast(`Account for ${users[idx].name} permanently disabled & blocked.`, "fa-ban");
+        renderBandsTable();
+    }
+}
+
+function reenableStaffAccount(userId) {
+    if (!ensureMasterOwnerAuthority()) return;
+    let users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    if (idx !== -1) {
+        users[idx].status = "ACTIVE";
+        saveRegisteredUsers(users);
+        showToast(`Access re-enabled for ${users[idx].name}.`, "fa-user-check");
+        renderBandsTable();
+    }
+}
+
+function deleteStaffAccount(userId) {
+    if (!ensureMasterOwnerAuthority()) return;
+    let users = getRegisteredUsers();
+    const target = users.find(u => u.id === userId || u.username === userId || u.email === userId);
+    const targetName = target ? target.name : "Staff user";
+    
+    if (confirm(`Are you sure you want to permanently delete user/band account '${targetName}'?`)) {
+        users = users.filter(u => u.id !== userId && u.username !== userId && u.email !== userId);
+        saveRegisteredUsers(users);
+        showToast(`User account '${targetName}' deleted permanently.`, "fa-trash-can");
+        renderBandsTable();
+    }
+}
+
+function changeUserRole(userId, newRole) {
+    if (!ensureMasterOwnerAuthority()) return;
+    let users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    if (idx !== -1) {
+        users[idx].role = newRole;
+        if (newRole === "Master HQ") {
+            users[idx].allowedTab = "ALL";
+        }
+        saveRegisteredUsers(users);
+        showToast(`Role for ${users[idx].name} changed to ${newRole}`, "fa-user-gear");
+        renderBandsTable();
+    }
+}
+
+function changeUserModule(userId, newModule) {
+    if (!ensureMasterOwnerAuthority()) return;
+    let users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    if (idx !== -1) {
+        users[idx].allowedTab = newModule;
+        saveRegisteredUsers(users);
+        showToast(`Unlocked module for ${users[idx].name} updated to '${newModule}'`, "fa-lock-open");
+        renderBandsTable();
+    }
+}
+
 // Explicit Global Window Exports for Inline HTML Onclick Handlers
 window.switchAuthMode = switchAuthMode;
 window.switchTab = switchTab;
@@ -3159,6 +3537,17 @@ window.handleRegisterSubmit = handleRegisterSubmit;
 window.handleSendApprovalRequestSubmit = handleSendApprovalRequestSubmit;
 window.verifyApprovalQuickPin = verifyApprovalQuickPin;
 window.verifyMainApprovalPin = verifyMainApprovalPin;
+window.openMasterPinModal = openMasterPinModal;
+window.closeMasterPinModal = closeMasterPinModal;
+window.verifyMasterPinUnlock = verifyMasterPinUnlock;
+window.setBandFilter = setBandFilter;
+window.renderBandsTable = renderBandsTable;
+window.revokeStaffSession = revokeStaffSession;
+window.permanentlyDisableStaffAccount = permanentlyDisableStaffAccount;
+window.reenableStaffAccount = reenableStaffAccount;
+window.deleteStaffAccount = deleteStaffAccount;
+window.changeUserRole = changeUserRole;
+window.changeUserModule = changeUserModule;
 window.toggleLoginPassword = toggleLoginPassword;
 window.handleLogout = handleLogout;
 window.openProductModal = openProductModal;

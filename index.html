@@ -67,24 +67,24 @@
                 <p class="text-xs text-slate-400 mt-1">Secure portal for products, leads & catalog</p>
             </div>
 
-            <!-- Auth Mode Switch Tabs (3 Clear Options: Approval Request, OTP Login, Register) -->
+            <!-- Auth Mode Switch Tabs (Primary Sign In, Register, and Forgot / OTP) -->
             <div class="grid grid-cols-3 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 mb-6 gap-1.5">
-                <button type="button" onclick="switchAuthMode('approval')" id="authTab-approval" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
-                    <i class="fa-solid fa-envelope-circle-check text-xs"></i>
-                    <span>Request Access</span>
-                </button>
-                <button type="button" onclick="switchAuthMode('otp')" id="authTab-otp" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
-                    <i class="fa-solid fa-mobile-screen-button text-xs"></i>
-                    <span>Login with OTP</span>
+                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-cyan-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-lock text-xs"></i>
+                    <span>Sign In</span>
                 </button>
                 <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
                     <i class="fa-solid fa-user-plus text-xs"></i>
                     <span>Register</span>
                 </button>
+                <button type="button" onclick="switchAuthMode('otp')" id="authTab-otp" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-mobile-screen-button text-xs"></i>
+                    <span>Login with OTP</span>
+                </button>
             </div>
 
             <!-- 0. EMAIL APPROVAL REQUEST FORM (Target: mehtapratham907@gmail.com) -->
-            <form id="adminApprovalRequestForm" onsubmit="handleSendApprovalRequestSubmit(event)" autocomplete="off" class="space-y-4 relative">
+            <form id="adminApprovalRequestForm" onsubmit="handleSendApprovalRequestSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
                 <div class="p-3.5 bg-amber-950/40 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-slate-300 text-xs">
                     <div class="w-8 h-8 rounded-xl bg-amber-900/60 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0 text-sm mt-0.5 shadow">
                         <i class="fa-solid fa-shield-halved"></i>
@@ -125,10 +125,10 @@
                     <div>
                         <label class="block text-xs font-bold text-slate-300 mb-1.5">Access Purpose *</label>
                         <select id="approvalPurpose" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-3 text-xs text-white focus:outline-none transition">
-                            <option value="Full Portal Access">Full Admin Management</option>
                             <option value="Product & Price Updates">Product &amp; Price Updates</option>
                             <option value="Leads & Inquiries Review">Leads &amp; Customer Quotes</option>
                             <option value="Emergency Access">Emergency Access Request</option>
+                            <option value="Staff Member Access">Staff Member Access</option>
                         </select>
                     </div>
                 </div>
@@ -139,24 +139,6 @@
                     <i class="fa-solid fa-paper-plane"></i>
                     <span>Send Approval Request to Owner Email</span>
                 </button>
-
-                <!-- Owner Quick Security PIN Unlock (Bypass Approval) -->
-                <div class="pt-3 border-t border-slate-800/80 mt-3.5">
-                    <label class="block text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1.5">
-                        <i class="fa-solid fa-key text-cyan-400"></i>
-                        <span>Owner Security PIN Unlock</span>
-                    </label>
-                    <div class="flex items-center gap-2">
-                        <div class="relative flex-1">
-                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-lock"></i></span>
-                            <input type="password" id="approvalInitialPin" placeholder="Enter Security PIN" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyMainApprovalPin();}" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-2.5 text-xs text-white focus:outline-none placeholder-slate-600 transition">
-                        </div>
-                        <button type="button" onclick="verifyMainApprovalPin()" class="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer whitespace-nowrap shadow shadow-cyan-950/40 flex items-center gap-1.5">
-                            <i class="fa-solid fa-unlock-keyhole"></i>
-                            <span>Instant Unlock</span>
-                        </button>
-                    </div>
-                </div>
             </form>
 
             <!-- 0.5. WAITING FOR EMAIL APPROVAL LIVE SCREEN -->
@@ -207,21 +189,6 @@
                 <div class="p-3 bg-amber-950/30 border border-amber-500/20 rounded-2xl text-left text-xs text-amber-300/90">
                     <i class="fa-solid fa-circle-info mr-1 text-amber-400"></i>
                     <span>As soon as the Owner approves, your 6-digit Login OTP will be dispatched to your email and this screen will transition to the verification step.</span>
-                </div>
-
-                <!-- Instant Owner Quick-Approve / PIN Bypass -->
-                <div class="p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-2xl space-y-2 text-left">
-                    <div class="flex items-center justify-between">
-                        <span class="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-key text-[10px]"></i> Owner PIN Unlock (Bypass Waiting):
-                        </span>
-                    </div>
-                    <div class="flex gap-2">
-                        <input type="password" id="approvalQuickPin" placeholder="Enter Security PIN" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyApprovalQuickPin();}" class="flex-1 bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none placeholder-slate-600 transition">
-                        <button type="button" onclick="verifyApprovalQuickPin()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer flex items-center gap-1">
-                            <i class="fa-solid fa-unlock-keyhole text-[10px]"></i> Unlock
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Direct Email Dispatch Fallback (Opens Gmail / Mail App) -->
@@ -319,8 +286,16 @@
                 </div>
             </form>
 
-            <!-- 1.5. SIGN IN FORM (PASSWORD / PIN) -->
-            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
+            <!-- 1. SIGN IN FORM (PASSWORD / PIN) -->
+            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative">
+                <div class="p-3 bg-cyan-950/40 border border-cyan-500/20 rounded-2xl flex items-start gap-2.5 text-slate-300 text-xs">
+                    <i class="fa-solid fa-lock text-cyan-400 text-base shrink-0 mt-0.5"></i>
+                    <div>
+                        <span class="font-bold text-white block">Secure Staff &amp; Admin Login</span>
+                        <span class="text-slate-400 text-[11px]">Enter your username/mobile and password. Login remains active for 24 hours.</span>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-slate-300 mb-1.5">Username, Mobile or Email</label>
                     <div class="relative">
@@ -348,11 +323,11 @@
                 </button>
 
                 <div class="flex items-center justify-between text-[11px] pt-1">
-                    <button type="button" onclick="switchAuthMode('otp')" class="text-indigo-400 hover:text-indigo-300 transition font-semibold cursor-pointer">
-                        <i class="fa-solid fa-mobile-screen mr-1"></i> Sign In with OTP
+                    <button type="button" onclick="switchAuthMode('register')" class="text-emerald-400 hover:text-emerald-300 transition font-semibold cursor-pointer">
+                        <i class="fa-solid fa-user-plus mr-1"></i> New User? Register
                     </button>
-                    <button type="button" onclick="switchAuthMode('approval')" class="text-amber-400 hover:text-amber-300 transition font-semibold cursor-pointer">
-                        <i class="fa-solid fa-shield-halved mr-1"></i> Request Access
+                    <button type="button" onclick="switchAuthMode('otp')" class="text-indigo-400 hover:text-indigo-300 transition font-semibold cursor-pointer">
+                        <i class="fa-solid fa-mobile-screen mr-1"></i> Login with OTP
                     </button>
                 </div>
             </form>
@@ -408,13 +383,13 @@
                 </div>
             </form>
 
-            <!-- 3. REGISTRATION FORM (Requiring Owner Approval) -->
+            <!-- 3. REGISTRATION FORM (Direct Instant Account Creation) -->
             <form id="adminRegisterForm" onsubmit="handleRegisterSubmit(event)" autocomplete="off" class="space-y-3.5 relative hidden">
                 <div class="p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl flex items-start gap-2.5 text-slate-300 text-xs">
-                    <i class="fa-solid fa-user-shield text-emerald-400 text-base shrink-0 mt-0.5"></i>
+                    <i class="fa-solid fa-user-plus text-emerald-400 text-base shrink-0 mt-0.5"></i>
                     <div>
-                        <span class="font-bold text-white block">Staff Registration &amp; Approval</span>
-                        <span class="text-slate-400 text-[11px]">Registering will notify the Owner for authorization. Once approved, your login OTP will arrive on your email.</span>
+                        <span class="font-bold text-white block">Create Staff / Admin Account</span>
+                        <span class="text-slate-400 text-[11px]">Set your personal password during registration so you can sign in directly without repeated OTPs.</span>
                     </div>
                 </div>
 
@@ -424,7 +399,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-300 mb-1">Your Email Address (For Receiving Login OTP) *</label>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Your Email Address *</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-envelope"></i></span>
                         <input type="email" id="regEmail" required autocomplete="off" placeholder="Enter your email address" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
@@ -444,9 +419,21 @@
                     <input type="text" id="regUsername" required autocomplete="off" placeholder="Choose a username" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                 </div>
 
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1">Staff Department / Role *</label>
+                    <select id="regDesignation" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 text-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none transition cursor-pointer font-medium">
+                        <option value="Sales Executive">💼 Sales &amp; Lead Executive</option>
+                        <option value="Store Manager">📦 Store &amp; Inventory Manager</option>
+                        <option value="Manager">👔 General Manager</option>
+                        <option value="Accounts Staff">📑 Accounts &amp; Billing Staff</option>
+                        <option value="Dispatch Executive">🚚 Order &amp; Dispatch Executive</option>
+                        <option value="Staff Member" selected>👤 General Staff Member</option>
+                    </select>
+                </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                        <label class="block text-xs font-bold text-slate-300 mb-1">Choose Password *</label>
+                        <label class="block text-xs font-bold text-slate-300 mb-1">Set Password *</label>
                         <input type="password" id="regPassword" required autocomplete="new-password" placeholder="Min 4 characters" class="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                     </div>
                     <div>
@@ -458,13 +445,13 @@
                 <div id="registerError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
 
                 <button type="submit" id="registerBtn" class="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
-                    <i class="fa-solid fa-paper-plane"></i>
-                    <span>Register &amp; Request Approval</span>
+                    <i class="fa-solid fa-user-check"></i>
+                    <span>Create Account &amp; Sign In</span>
                 </button>
 
                 <div class="text-center pt-1">
                     <button type="button" onclick="switchAuthMode('login')" class="text-[11px] text-slate-400 hover:text-cyan-400 transition">
-                        Already have an approved account? <span class="font-bold text-cyan-400">Sign In</span>
+                        Already have an account? <span class="font-bold text-cyan-400">Sign In</span>
                     </button>
                 </div>
             </form>
@@ -528,6 +515,12 @@
                         <span>Return to Website</span>
                     </a>
 
+                    <!-- Owner Security PIN Unlock Option (When logged in) -->
+                    <button onclick="openMasterPinModal()" id="unlockMasterPinHeaderBtn" class="bg-amber-950/70 hover:bg-amber-900/90 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm">
+                        <i class="fa-solid fa-key text-amber-400"></i>
+                        <span id="headerMasterPinBadgeText">Owner Security PIN</span>
+                    </button>
+
                     <!-- Cloud Sync -->
                     <button onclick="syncAllCloudData()" id="syncDataBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer" title="Sync leads and data with cloud">
                         <i class="fa-solid fa-arrows-rotate text-[10px] text-emerald-400"></i>
@@ -551,27 +544,27 @@
                 <nav class="flex space-x-2 shrink-0">
                     <button onclick="switchTab('products')" id="tabNav-products" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-950/40 cursor-pointer">
                         <i class="fa-solid fa-boxes-stacked"></i>
-                        <span>Products Catalog (<span id="badgeCountProducts">0</span>)</span>
+                        <span>Product &amp; Price Update (<span id="badgeCountProducts">0</span>)</span>
                     </button>
 
                     <button onclick="switchTab('leads')" id="tabNav-leads" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
                         <i class="fa-solid fa-clipboard-list"></i>
-                        <span>Inquiries & Quotes (<span id="badgeCountLeads">0</span>)</span>
+                        <span>Leads &amp; Inquiries (<span id="badgeCountLeads">0</span>)</span>
                     </button>
 
-                    <button onclick="switchTab('reviews')" id="tabNav-reviews" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
-                        <i class="fa-solid fa-star"></i>
-                        <span>Reviews (<span id="badgeCountReviews">0</span>)</span>
+                    <button onclick="switchTab('broadcasts')" id="tabNav-broadcasts" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-amber-400 hover:text-white border border-slate-800 cursor-pointer">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>Emergency &amp; Alerts (<span id="badgeCountBroadcasts">0</span>)</span>
+                    </button>
+
+                    <button onclick="switchTab('bands')" id="tabNav-bands" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-emerald-400 hover:text-white border border-slate-800 cursor-pointer">
+                        <i class="fa-solid fa-users-gear"></i>
+                        <span>Staff &amp; Band Access (<span id="badgeCountBands">0</span>)</span>
                     </button>
 
                     <button onclick="switchTab('settings')" id="tabNav-settings" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800 cursor-pointer">
                         <i class="fa-solid fa-sliders"></i>
-                        <span>Backup & Settings</span>
-                    </button>
-
-                    <button onclick="switchTab('broadcasts')" id="tabNav-broadcasts" class="tab-btn px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 bg-slate-900 text-amber-400 hover:text-white border border-slate-800 cursor-pointer">
-                        <i class="fa-solid fa-tower-broadcast"></i>
-                        <span>Push &amp; Version Alerts (<span id="badgeCountBroadcasts">0</span>)</span>
+                        <span>Backup &amp; Settings</span>
                     </button>
                 </nav>
             </div>
@@ -961,6 +954,62 @@
                 </div>
             </div>
 
+            <!-- ==================================================================
+                 TAB 4: STAFF & BAND ACCESS MANAGEMENT (Device Sessions & Credentials)
+                 ================================================================== -->
+            <div id="tabContent-bands" class="tab-pane space-y-6 hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 p-4 sm:p-5 rounded-2xl">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-users-gear text-cyan-400"></i>
+                            <span>Staff Credentials &amp; Band Access Management</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Track logged-in bands, active staff credentials, accept/reject requests, and permanently disable blocked accounts.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="renderBandsTable()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-700 cursor-pointer">
+                            <i class="fa-solid fa-rotate-right text-cyan-400"></i>
+                            <span>Refresh Credentials &amp; Bands</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Band / Staff List Table -->
+                <div class="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-4 sm:p-5 space-y-4">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <div class="relative w-full sm:w-72">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="text" id="bandSearchInput" oninput="renderBandsTable()" placeholder="Search staff name, email, mobile or band..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 transition">
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="text-slate-400">Filter:</span>
+                            <button onclick="setBandFilter('ALL')" id="bandFilter-ALL" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white cursor-pointer">All</button>
+                            <button onclick="setBandFilter('ACTIVE')" id="bandFilter-ACTIVE" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-400 hover:text-white cursor-pointer">Active</button>
+                            <button onclick="setBandFilter('BLOCKED')" id="bandFilter-BLOCKED" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-400 hover:text-white cursor-pointer">Blocked / Disabled</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3">Staff / Band Member</th>
+                                    <th class="p-3">Credentials (Email / Mobile)</th>
+                                    <th class="p-3">Logged-in Band / Device</th>
+                                    <th class="p-3">Role</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Access Controls</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bandsTableBody" class="divide-y divide-slate-800/60">
+                                <!-- Dynamic rendering via script -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
@@ -1234,6 +1283,43 @@
                     <i class="fa-solid fa-check text-[10px]"></i>
                     <span id="confirmActionText">Delete</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MASTER SECURITY PIN UNLOCK MODAL (Post-Login Owner Master Elevation) -->
+    <div id="masterPinUnlockModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg hidden">
+        <div class="bg-slate-900 border-2 border-amber-500/50 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center gap-3 border-b border-slate-800 pb-3">
+                <div class="w-12 h-12 rounded-2xl bg-amber-950 border border-amber-500/40 text-amber-400 flex items-center justify-center text-xl shrink-0 shadow-lg shadow-amber-950/60">
+                    <i class="fa-solid fa-crown"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm text-white">Master Access PIN Unlock</h3>
+                    <p class="text-[11px] text-slate-400">Owner security PIN required to unlock Master Rights</p>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Enter Owner Security PIN</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400 text-xs"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" id="modalMasterPinInput" placeholder="Enter Security PIN" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyMasterPinUnlock();}" class="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none transition font-mono tracking-widest text-center text-base">
+                    </div>
+                </div>
+
+                <div id="masterPinModalError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2 rounded-xl text-center font-medium"></div>
+
+                <div class="flex items-center justify-end gap-2 pt-1">
+                    <button type="button" onclick="closeMasterPinModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-4 py-2.5 rounded-xl transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="verifyMasterPinUnlock()" class="bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-500 hover:to-yellow-400 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition shadow-lg shadow-amber-950/60 flex items-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-unlock-keyhole"></i>
+                        <span>Unlock Master Access</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
