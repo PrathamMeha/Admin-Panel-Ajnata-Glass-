@@ -236,19 +236,9 @@ const DEFAULT_REVIEWS = [
     }
 ];
 
-// Global State
-let currentTab = "products";
-let activeLeadStatusFilter = "ALL";
-
-// ==========================================
 // ==========================================
 // 1. AUTHENTICATION, SERVER STORAGE & USER ISOLATION
 // ==========================================
-const CLOUD_SYNC_CONFIG = {
-    USERS_KEY: "ajanta_cloud_registered_users_v2",
-    LEADS_KEY: "sunny_ajanta_leads_key",
-    BASE_URL: "https://kvdb.io/T2p78Krq12XcfWn1vNiw9G/"
-};
 
 function getRegisteredUsers() {
     try {
@@ -312,24 +302,20 @@ function switchAuthMode(mode) {
     const apprForm = document.getElementById("adminApprovalRequestForm");
     const apprWaiting = document.getElementById("adminApprovalWaitingView");
     const loginForm = document.getElementById("adminLoginForm");
-    const otpReqForm = document.getElementById("adminOtpRequestForm");
     const otpVerForm = document.getElementById("adminOtpVerifyForm");
     const registerForm = document.getElementById("adminRegisterForm");
 
     const tabAppr = document.getElementById("authTab-approval");
-    const tabOtp = document.getElementById("authTab-otp");
     const tabLogin = document.getElementById("authTab-login");
     const tabRegister = document.getElementById("authTab-register");
 
     const apprErr = document.getElementById("approvalRequestError");
     const loginErr = document.getElementById("loginError");
-    const otpReqErr = document.getElementById("otpRequestError");
     const otpVerErr = document.getElementById("otpVerifyError");
     const regErr = document.getElementById("registerError");
 
     if (apprErr) apprErr.classList.add("hidden");
     if (loginErr) loginErr.classList.add("hidden");
-    if (otpReqErr) otpReqErr.classList.add("hidden");
     if (otpVerErr) otpVerErr.classList.add("hidden");
     if (regErr) regErr.classList.add("hidden");
 
@@ -337,14 +323,12 @@ function switchAuthMode(mode) {
     if (apprForm) apprForm.classList.add("hidden");
     if (apprWaiting) apprWaiting.classList.add("hidden");
     if (loginForm) loginForm.classList.add("hidden");
-    if (otpReqForm) otpReqForm.classList.add("hidden");
     if (otpVerForm) otpVerForm.classList.add("hidden");
     if (registerForm) registerForm.classList.add("hidden");
 
     // Reset tab styling
     const inactiveStyle = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
     if (tabAppr) tabAppr.className = inactiveStyle;
-    if (tabOtp) tabOtp.className = inactiveStyle;
     if (tabLogin) tabLogin.className = inactiveStyle;
     if (tabRegister) tabRegister.className = inactiveStyle;
 
@@ -353,16 +337,6 @@ function switchAuthMode(mode) {
         if (tabRegister) tabRegister.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-emerald-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const rName = document.getElementById("regName");
         if (rName) setTimeout(() => rName.focus(), 50);
-    } else if (mode === "otp") {
-        if (otpReqForm) otpReqForm.classList.remove("hidden");
-        if (tabOtp) tabOtp.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-indigo-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
-        const mobInput = document.getElementById("otpMobileInput");
-        if (mobInput) setTimeout(() => mobInput.focus(), 50);
-    } else if (mode === "verify_otp") {
-        if (otpVerForm) otpVerForm.classList.remove("hidden");
-        if (tabOtp) tabOtp.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-cyan-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
-        const d1 = document.getElementById("otpDigit1");
-        if (d1) setTimeout(() => d1.focus(), 100);
     } else if (mode === "login") {
         if (loginForm) loginForm.classList.remove("hidden");
         if (tabLogin) tabLogin.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-cyan-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
@@ -371,8 +345,13 @@ function switchAuthMode(mode) {
     } else if (mode === "waiting_approval") {
         if (apprWaiting) apprWaiting.classList.remove("hidden");
         if (tabAppr) tabAppr.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+    } else if (mode === "verify_otp") {
+        if (otpVerForm) otpVerForm.classList.remove("hidden");
+        if (tabAppr) tabAppr.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-emerald-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        const d1 = document.getElementById("otpDigit1");
+        if (d1) setTimeout(() => d1.focus(), 100);
     } else {
-        // Default: Email Approval
+        // Default: Request Access
         if (apprForm) apprForm.classList.remove("hidden");
         if (tabAppr) tabAppr.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const nameInp = document.getElementById("approvalRequesterName");
@@ -401,13 +380,97 @@ function loginDirectAsOwner() {
 }
 
 // ==========================================
-// 1. OWNER EMAIL ACCESS APPROVAL SYSTEM
+// 1. OWNER EMAIL ACCESS APPROVAL & EMAIL OTP SYSTEM
 // ==========================================
+
+// Helper: Dispatch 6-digit OTP code to requester's email address (Free via FormSubmit)
+async function dispatchOtpToRequesterEmail(userEmail, userName, otpCode, ticketId) {
+    if (!userEmail) return;
+
+    // 1. Submit via hidden iframe form (zero CORS issues, 100% reliable)
+    try {
+        const hUserForm = document.getElementById("hiddenUserOtpEmailForm");
+        if (hUserForm) {
+            hUserForm.action = `https://formsubmit.co/${encodeURIComponent(userEmail)}`;
+            const subj = document.getElementById("hiddenUserOtpSubject");
+            const nameEl = document.getElementById("hiddenUserOtpName");
+            const codeEl = document.getElementById("hiddenUserOtpCode");
+            const tickEl = document.getElementById("hiddenUserOtpTicket");
+
+            if (subj) subj.value = `🔐 Your Ajanta Admin Access OTP Code: ${otpCode}`;
+            if (nameEl) nameEl.value = userName || "Admin Staff";
+            if (codeEl) codeEl.value = otpCode;
+            if (tickEl) tickEl.value = ticketId || "AJANTA-APPR";
+
+            hUserForm.submit();
+        }
+    } catch (err) {
+        console.warn("User OTP hidden form submit note:", err);
+    }
+
+    // 2. Also attempt AJAX post via FormSubmit
+    try {
+        fetch(`https://formsubmit.co/ajax/${encodeURIComponent(userEmail)}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                _subject: `🔐 Your Ajanta Admin Access OTP Code: ${otpCode}`,
+                "Hello": userName || "Admin Staff",
+                "Approval Status": `APPROVED by Owner (${OWNER_EMAIL})`,
+                "Your 6-Digit OTP Code": otpCode,
+                "Ticket Reference": ticketId || "N/A",
+                "Validity": "10 Minutes",
+                "Instructions": "Enter this 6-digit verification code in the Ajanta Admin portal to access your dashboard.",
+                _template: "table",
+                _captcha: "false"
+            })
+        }).catch(e => console.warn("User OTP AJAX note:", e));
+    } catch (e) {
+        console.warn("User OTP dispatch error:", e);
+    }
+}
+
+// Helper: Owner approves ticket, generates 6-digit OTP and dispatches it to requester's email
+async function approveTicketAndDispatchOtp(ticketId, existingData) {
+    const otpCode = generateSecureRandomOtp();
+    const updatedData = {
+        ...(existingData || {}),
+        id: ticketId,
+        status: "APPROVED",
+        approvedBy: OWNER_EMAIL,
+        approvedAt: new Date().toISOString(),
+        otpCode: otpCode
+    };
+
+    // 1. Broadcast to cloud KVDB so polling picks it up
+    try {
+        await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedData)
+        });
+    } catch (e) {
+        console.warn("Approve ticket cloud broadcast note:", e);
+    }
+
+    // 2. Dispatch OTP to the requester's email
+    const targetEmail = updatedData.email || (currentApprovalState.details && currentApprovalState.details.email);
+    if (targetEmail) {
+        dispatchOtpToRequesterEmail(targetEmail, updatedData.requester, otpCode, ticketId);
+    }
+
+    return updatedData;
+}
+
 async function handleSendApprovalRequestSubmit(e) {
     if (e) e.preventDefault();
     const name = document.getElementById("approvalRequesterName")?.value?.trim() || "";
+    const email = document.getElementById("approvalRequesterEmail")?.value?.trim() || "";
     const mobile = document.getElementById("approvalRequesterMobile")?.value?.trim() || "";
-    const purpose = document.getElementById("approvalPurpose")?.value || "Full Portal Access";
+    const purpose = document.getElementById("approvalPurpose")?.value || "Portal Access";
     const errBox = document.getElementById("approvalRequestError");
     const sendBtn = document.getElementById("sendApprovalBtn");
 
@@ -418,8 +481,17 @@ async function handleSendApprovalRequestSubmit(e) {
         }
     }
 
-    if (!name || !mobile) {
-        showErr("Please provide both your full name and mobile number.");
+    if (!name) {
+        showErr("Please enter your full name.");
+        return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showErr("Please enter a valid email address (OTP will be sent here upon approval).");
+        return;
+    }
+    const cleanMobile = mobile.replace(/[^0-9]/g, "");
+    if (cleanMobile.length !== 10) {
+        showErr("Please enter a valid 10-digit mobile number.");
         return;
     }
 
@@ -439,7 +511,8 @@ async function handleSendApprovalRequestSubmit(e) {
         id: ticketId,
         status: "PENDING",
         requester: name,
-        mobile: mobile,
+        email: email,
+        mobile: cleanMobile,
         purpose: purpose,
         targetEmail: OWNER_EMAIL,
         pin: approvalPin,
@@ -458,7 +531,33 @@ async function handleSendApprovalRequestSubmit(e) {
         console.warn("Cloud ticket creation note:", err);
     }
 
-    // 2. Dispatch Real Email to mehtapratham907@gmail.com
+    // 2. Dispatch Email to Owner via native hidden form POST
+    try {
+        const hForm = document.getElementById("hiddenEmailForm");
+        if (hForm) {
+            const subjEl = document.getElementById("hiddenFormSubject");
+            const nameEl = document.getElementById("hiddenFormName");
+            const emailEl = document.getElementById("hiddenFormEmail");
+            const mobEl = document.getElementById("hiddenFormMobile");
+            const purpEl = document.getElementById("hiddenFormPurpose");
+            const tickEl = document.getElementById("hiddenFormTicket");
+            const urlEl = document.getElementById("hiddenFormApproveUrl");
+
+            if (subjEl) subjEl.value = `🚨 [APPROVAL REQUIRED] Ajanta Admin Access: ${name} (${ticketId})`;
+            if (nameEl) nameEl.value = name;
+            if (emailEl) emailEl.value = email;
+            if (mobEl) mobEl.value = cleanMobile;
+            if (purpEl) purpEl.value = purpose;
+            if (tickEl) tickEl.value = ticketId;
+            if (urlEl) urlEl.value = approveUrl;
+
+            hForm.submit();
+        }
+    } catch (e) {
+        console.warn("Hidden form email submit error:", e);
+    }
+
+    // Also attempt AJAX dispatch to Owner
     try {
         fetch(`https://formsubmit.co/ajax/${OWNER_EMAIL}`, {
             method: "POST",
@@ -467,20 +566,42 @@ async function handleSendApprovalRequestSubmit(e) {
                 "Accept": "application/json"
             },
             body: JSON.stringify({
-                _subject: `🚨 [APPROVAL REQUIRED] Ajanta Admin Access: ${ticketId}`,
+                _subject: `🚨 [APPROVAL REQUIRED] Ajanta Admin Access: ${name} (${ticketId})`,
                 "Requester Name": name,
-                "Mobile Number": mobile,
+                "Requester Email": email,
+                "Mobile Number": cleanMobile,
                 "Access Purpose": purpose,
                 "Ticket ID": ticketId,
                 "Requested Time": new Date().toLocaleString(),
                 "1-Click Approve URL": approveUrl,
-                "Master Unlock PIN": approvalPin,
                 _template: "table",
                 _captcha: "false"
             })
         }).catch(e => console.warn("Email dispatch note:", e));
     } catch (e) {
         console.warn("Email dispatch error:", e);
+    }
+
+    // 3. Update Direct Mailto link for Gmail / native Mail apps
+    try {
+        const mailtoLink = document.getElementById("waitingMailtoLink");
+        if (mailtoLink) {
+            const mailSubject = encodeURIComponent(`[APPROVAL REQUIRED] Ajanta Admin Access: ${ticketId}`);
+            const mailBody = encodeURIComponent(
+                `Hi Pratham,\n\nA new admin login approval has been requested:\n\n` +
+                `Requester Name: ${name}\n` +
+                `Requester Email: ${email}\n` +
+                `Mobile Number: ${cleanMobile}\n` +
+                `Access Purpose: ${purpose}\n` +
+                `Ticket ID: ${ticketId}\n` +
+                `Requested Time: ${new Date().toLocaleString()}\n\n` +
+                `Click below to approve and dispatch 6-digit OTP to requester:\n${approveUrl}\n\n` +
+                `Or use Security PIN: 2601\n`
+            );
+            mailtoLink.href = `mailto:${OWNER_EMAIL}?subject=${mailSubject}&body=${mailBody}`;
+        }
+    } catch (e) {
+        console.warn("Mailto setup note:", e);
     }
 
     if (sendBtn) {
@@ -499,26 +620,36 @@ async function handleSendApprovalRequestSubmit(e) {
     // Update UI elements
     const waitTicketEl = document.getElementById("waitingTicketId");
     if (waitTicketEl) waitTicketEl.textContent = ticketId;
+    const waitEmailEl = document.getElementById("waitingTargetEmail");
+    if (waitEmailEl) waitEmailEl.textContent = email;
 
     switchAuthMode("waiting_approval");
 
-    // Trigger Notification Banner with 1-Click Approve action for testing/owner
+    // Push notification banner for Owner quick review
     triggerSystemPushBanner({
         title: "Owner Email Approval Request Sent",
-        body: `Access approval ticket <span class="font-mono font-bold text-amber-300">${ticketId}</span> dispatched to <strong class="text-amber-300">${OWNER_EMAIL}</strong>. Click Approve link in mail to grant instant access.`,
+        body: `Access approval ticket <span class="font-mono font-bold text-amber-300">${ticketId}</span> dispatched to <strong class="text-amber-300">${OWNER_EMAIL}</strong>.`,
         icon: "fa-envelope-circle-check",
         actions: [
             {
                 html: `<i class="fa-solid fa-check text-[10px]"></i> Quick Approve (Owner)`,
                 className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
-                onClick: () => simulateOwnerApproveCurrentTicket()
+                onClick: () => {
+                    dismissPushBanner();
+                    simulateOwnerApproveCurrentTicket();
+                }
+            },
+            {
+                html: `<i class="fa-solid fa-xmark text-[10px]"></i> Dismiss`,
+                className: "bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1",
+                onClick: () => dismissPushBanner()
             }
         ],
         sound: true
     });
 
     startApprovalPolling(ticketId);
-    showToast(`Approval request sent to ${OWNER_EMAIL}!`, "fa-paper-plane");
+    showToast(`Approval request sent to ${OWNER_EMAIL}! Check inbox/spam or tap 'Send via Gmail App'.`, "fa-paper-plane");
 }
 
 function startApprovalPolling(ticketId) {
@@ -541,7 +672,7 @@ function startApprovalPolling(ticketId) {
                 if (data && data.status === "APPROVED") {
                     clearInterval(currentApprovalState.pollTimer);
                     currentApprovalState.pollTimer = null;
-                    grantAccessViaApproval(data);
+                    transitionToEmailOtpVerification(data);
                 } else if (data && data.status === "DENIED") {
                     clearInterval(currentApprovalState.pollTimer);
                     currentApprovalState.pollTimer = null;
@@ -555,78 +686,96 @@ function startApprovalPolling(ticketId) {
     }, 2000);
 }
 
-function grantAccessViaApproval(ticketData) {
+// Transition from waiting to entering the 6-Digit Email OTP
+function transitionToEmailOtpVerification(ticketData) {
     playChimeSound("alert");
-    const requester = ticketData?.requester || "Pratham Mehta";
-    const userObj = {
-        name: requester,
-        username: "pratham_mehta",
-        mobile: ticketData?.mobile || "9812500455",
-        role: "Owner Authorized Admin",
-        authType: "email_approval",
-        ticketId: ticketData?.id || "N/A"
-    };
-
-    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userObj));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userObj));
-    showToast(`Access Approved! Welcome, ${requester}`, "fa-circle-check");
-
-    checkAuthSession();
-}
-
-// Instant 1-Click Owner Quick Approve Simulator / Tester
-function simulateOwnerApproveCurrentTicket() {
-    if (!currentApprovalState.ticketId) {
-        const dummyTicket = `AJANTA-APPR-${Math.floor(10000 + Math.random() * 90000)}`;
-        currentApprovalState.ticketId = dummyTicket;
-    }
-
-    const ticketId = currentApprovalState.ticketId;
-    const ticketData = currentApprovalState.details || {
-        id: ticketId,
-        status: "APPROVED",
-        requester: document.getElementById("approvalRequesterName")?.value || "Pratham Mehta",
-        mobile: "9812500455",
-        approvedBy: OWNER_EMAIL
-    };
-    ticketData.status = "APPROVED";
-
-    // Non-blocking cloud broadcast
-    try {
-        fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(ticketData)
-        }).catch(e => console.warn("Simulate approve note:", e));
-    } catch (e) {
-        console.warn("Simulate approve note:", e);
-    }
-
+    dismissPushBanner();
+    const modal = document.getElementById("ownerApprovalActionModal");
+    if (modal) modal.classList.add("hidden");
     if (currentApprovalState.pollTimer) {
         clearInterval(currentApprovalState.pollTimer);
         currentApprovalState.pollTimer = null;
     }
 
-    grantAccessViaApproval(ticketData);
+    const requester = ticketData?.requester || currentApprovalState.details?.requester || "Approved Staff";
+    const email = ticketData?.email || currentApprovalState.details?.email || "";
+    const mobile = ticketData?.mobile || currentApprovalState.details?.mobile || "";
+    const username = ticketData?.username || currentApprovalState.details?.username || (email ? email.split("@")[0] : "admin");
+    const otpCode = ticketData?.otpCode || currentApprovalState.details?.otpCode || generateSecureRandomOtp();
+
+    currentOtpState = {
+        code: otpCode,
+        email: email,
+        user: {
+            name: requester,
+            username: username,
+            email: email,
+            mobile: mobile,
+            role: "Authorized Admin Staff",
+            authType: "email_approval_otp",
+            ticketId: ticketData?.id || currentApprovalState.ticketId || "N/A"
+        },
+        targetDisplay: email || (mobile ? `+91 ${mobile}` : "your email"),
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        cooldown: 59,
+        timerId: null
+    };
+
+    const targetDispEl = document.getElementById("otpTargetDisplay");
+    if (targetDispEl) targetDispEl.textContent = currentOtpState.targetDisplay;
+
+    // Clear digit boxes
+    for (let i = 1; i <= 6; i++) {
+        const d = document.getElementById(`otpDigit${i}`);
+        if (d) d.value = "";
+    }
+
+    switchAuthMode("verify_otp");
+    startOtpCountdown();
+    showToast(`Owner Approved! 6-Digit OTP sent to ${currentOtpState.targetDisplay}`, "fa-envelope-circle-check");
+}
+
+// Instant 1-Click Owner Quick Approve Simulator / Tester
+async function simulateOwnerApproveCurrentTicket() {
+    dismissPushBanner();
+    const modal = document.getElementById("ownerApprovalActionModal");
+    if (modal) modal.classList.add("hidden");
+
+    if (!currentApprovalState.ticketId) {
+        currentApprovalState.ticketId = `AJANTA-APPR-${Math.floor(10000 + Math.random() * 90000)}`;
+    }
+
+    const ticketId = currentApprovalState.ticketId;
+    const ticketData = currentApprovalState.details || {
+        id: ticketId,
+        status: "PENDING",
+        requester: document.getElementById("approvalRequesterName")?.value || "Staff Member",
+        email: document.getElementById("approvalRequesterEmail")?.value || document.getElementById("regEmail")?.value || "staff@ajantashoes.com",
+        mobile: document.getElementById("approvalRequesterMobile")?.value || "9812500455"
+    };
+
+    const approved = await approveTicketAndDispatchOtp(ticketId, ticketData);
+    transitionToEmailOtpVerification(approved);
 }
 
 function verifyApprovalQuickPin() {
     const pin = document.getElementById("approvalQuickPin")?.value?.trim();
     if (pin === "2601" || pin === "9070" || (currentApprovalState.details && pin === currentApprovalState.details.pin)) {
+        dismissPushBanner();
         simulateOwnerApproveCurrentTicket();
     } else {
-        showToast("Invalid Master PIN. Please use 2601.", "fa-triangle-exclamation");
+        showToast("Invalid Security PIN. Access denied.", "fa-triangle-exclamation");
     }
 }
 
 function verifyMainApprovalPin() {
     const pin = document.getElementById("approvalInitialPin")?.value?.trim();
     if (pin === "2601" || pin === "9070") {
-        simulateOwnerApproveCurrentTicket();
+        dismissPushBanner();
+        // Master PIN unlocks directly as Owner
+        loginDirectAsOwner();
     } else {
-        showToast("Invalid Master PIN. Please enter 2601.", "fa-triangle-exclamation");
+        showToast("Invalid Security PIN. Access denied.", "fa-triangle-exclamation");
     }
 }
 
@@ -647,44 +796,40 @@ async function handleOwnerApproveReject(isApproved) {
         return;
     }
 
-    const newStatus = isApproved ? "APPROVED" : "DENIED";
-    try {
-        fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: newStatus, actionTime: new Date().toISOString() })
-        }).catch(() => {});
-    } catch (e) {
-        console.warn("Approve action save error:", e);
-    }
-
     if (modal) modal.classList.add("hidden");
 
     if (isApproved) {
-        showToast("Access Granted! Logging in...", "fa-circle-check");
-        grantAccessViaApproval({ id: ticketId, requester: modal?.dataset?.requester || "Approved Admin" });
+        showToast("Access Approved! Dispatching OTP to requester...", "fa-circle-check");
+        const ticketData = currentApprovalState.details || { id: ticketId, requester: modal?.dataset?.requester || "Approved Staff" };
+        const approved = await approveTicketAndDispatchOtp(ticketId, ticketData);
+        transitionToEmailOtpVerification(approved);
     } else {
         showToast("Access Request Denied.", "fa-ban");
+        try {
+            fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "DENIED", actionTime: new Date().toISOString() })
+            }).catch(() => {});
+        } catch (e) {}
     }
 }
 
-function checkOwnerApprovalUrlQuery() {
+async function checkOwnerApprovalUrlQuery() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
         const ticketId = urlParams.get("approve_ticket");
         const action = urlParams.get("action");
 
-        if (ticketId) {
-            const requesterName = "Pratham Mehta";
-            showToast(`Access Approved from Email Link!`, "fa-circle-check");
-            grantAccessViaApproval({ id: ticketId, requester: requesterName, mobile: "9812500455" });
+        if (ticketId && action === "approve") {
+            let ticketData = null;
+            try {
+                const res = await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`);
+                if (res.ok) ticketData = await res.json();
+            } catch (e) {}
 
-            // Background cloud update
-            fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: ticketId, status: "APPROVED", approvedBy: OWNER_EMAIL, approvedAt: new Date().toISOString() })
-            }).catch(() => {});
+            const approved = await approveTicketAndDispatchOtp(ticketId, ticketData);
+            showToast(`Access Approved! 6-digit OTP dispatched to ${approved.email || "requester"}.`, "fa-circle-check");
         }
     } catch (err) {
         console.warn("URL query check error:", err);
@@ -700,109 +845,6 @@ function generateSecureRandomOtp() {
         return code.toString();
     }
     return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Handle OTP Request (Step 1)
-function handleSendOtpSubmit(e) {
-    if (e) e.preventDefault();
-    const identifier = document.getElementById("otpMobileInput")?.value?.trim() || "9812500455";
-    const errBox = document.getElementById("otpRequestError");
-    const sendBtn = document.getElementById("sendOtpBtn");
-
-    function showErr(msg) {
-        if (errBox) {
-            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
-            errBox.classList.remove("hidden");
-        }
-    }
-
-    if (!identifier) {
-        showErr("Please enter your registered mobile number or username.");
-        return;
-    }
-
-    let users = getRegisteredUsers();
-    const cleanId = identifier.replace(/[^0-9]/g, "");
-
-    // 1. Match local users
-    let matchedUser = users.find(u => {
-        const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
-        const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
-        return matchUser || matchMob;
-    });
-
-    // If user is not found, auto-provision admin session for seamless entry
-    if (!matchedUser) {
-        matchedUser = {
-            id: `usr-${Date.now()}`,
-            name: identifier.toLowerCase().includes("pratham") || cleanId === "9812500455" ? "Pratham Mehta" : (identifier.includes("@") ? identifier.split("@")[0] : (cleanId.length === 10 ? `User ${cleanId.slice(-4)}` : identifier)),
-            mobile: cleanId.length === 10 ? cleanId : "9812500455",
-            username: identifier.toLowerCase().replace(/[^a-z0-9_]/g, "") || "admin",
-            password: "2601",
-            createdAt: new Date().toISOString()
-        };
-        users.push(matchedUser);
-        saveRegisteredUsers(users);
-    }
-
-    if (sendBtn) {
-        sendBtn.disabled = false;
-        sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Generate &amp; Send Random OTP</span>`;
-    }
-
-    // Generate fresh random 6-digit OTP
-    const otpCode = generateSecureRandomOtp();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes validity
-
-    currentOtpState = {
-        code: otpCode,
-        user: matchedUser,
-        targetDisplay: matchedUser.mobile ? `+91 ${matchedUser.mobile}` : matchedUser.username,
-        expiresAt: expiresAt,
-        timerId: null,
-        cooldown: 59
-    };
-
-    // Update target display in UI
-    const targetDispEl = document.getElementById("otpTargetDisplay");
-    if (targetDispEl) targetDispEl.textContent = currentOtpState.targetDisplay;
-
-    // Clear previous digits
-    for (let i = 1; i <= 6; i++) {
-        const d = document.getElementById(`otpDigit${i}`);
-        if (d) d.value = "";
-    }
-
-    // Switch to Verification View
-    switchAuthMode("verify_otp");
-
-    // Trigger Instant High-Priority Push Notification Alert
-    triggerSystemPushBanner({
-        title: "Ajanta Security • Random Login OTP",
-        body: `Your random verification code is <span class="font-mono font-black text-cyan-300 text-sm tracking-widest bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/40">${otpCode}</span>. Valid for 5 minutes. DO NOT share this code with anyone.`,
-        icon: "fa-key",
-        actions: [
-            {
-                html: `<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill &amp; Sign In`,
-                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
-                onClick: () => autoFillCurrentOtp()
-            },
-            {
-                html: `<i class="fa-solid fa-copy text-[10px]"></i> Copy OTP`,
-                className: "bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition cursor-pointer border border-cyan-500/30",
-                onClick: () => {
-                    if (navigator.clipboard) {
-                        navigator.clipboard.writeText(otpCode);
-                        showToast(`OTP ${otpCode} copied to clipboard!`, "fa-copy");
-                    }
-                }
-            }
-        ],
-        sound: true
-    });
-
-    startOtpCountdown();
-    showToast(`Random OTP generated & sent to notification!`, "fa-paper-plane");
 }
 
 function startOtpCountdown() {
@@ -841,38 +883,42 @@ function autoFillCurrentOtp() {
         if (input && digits[i - 1]) input.value = digits[i - 1];
     }
     showToast("OTP Auto-Filled successfully!", "fa-wand-magic-sparkles");
-    // Automatically submit verification
     setTimeout(() => {
         handleVerifyOtpSubmit();
     }, 300);
 }
 
-function resendOtp() {
-    if (!currentOtpState.user) {
-        switchAuthMode("otp");
+async function resendOtpToEmail() {
+    const email = currentOtpState.email || (currentApprovalState.details && currentApprovalState.details.email);
+    if (!email) {
+        showToast("No email address found for resend.", "fa-triangle-exclamation");
         return;
     }
-    // Generate new random code
+
     const newOtp = generateSecureRandomOtp();
     currentOtpState.code = newOtp;
-    currentOtpState.expiresAt = Date.now() + 5 * 60 * 1000;
+    currentOtpState.expiresAt = Date.now() + 10 * 60 * 1000;
 
-    triggerSystemPushBanner({
-        title: "Ajanta Security • New Resent OTP",
-        body: `New random verification code is <span class="font-mono font-black text-cyan-300 text-sm tracking-widest bg-cyan-950/80 px-2 py-0.5 rounded-md border border-cyan-500/40">${newOtp}</span>. Valid for 5 minutes.`,
-        icon: "fa-rotate-right",
-        actions: [
-            {
-                html: `<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill &amp; Sign In`,
-                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
-                onClick: () => autoFillCurrentOtp()
-            }
-        ],
-        sound: true
-    });
+    const ticketId = currentApprovalState.ticketId || (currentOtpState.user && currentOtpState.user.ticketId) || "AJANTA-APPR";
+    const name = currentOtpState.user?.name || "Admin Staff";
 
+    // Cloud update
+    try {
+        fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                ...(currentApprovalState.details || {}),
+                status: "APPROVED",
+                otpCode: newOtp,
+                resubmittedAt: new Date().toISOString()
+            })
+        }).catch(() => {});
+    } catch (e) {}
+
+    dispatchOtpToRequesterEmail(email, name, newOtp, ticketId);
     startOtpCountdown();
-    showToast("New random OTP sent!", "fa-paper-plane");
+    showToast(`New OTP dispatched to ${email}`, "fa-paper-plane");
 }
 
 function handleVerifyOtpSubmit(e) {
@@ -889,35 +935,58 @@ function handleVerifyOtpSubmit(e) {
     let enteredCode = "";
     for (let i = 1; i <= 6; i++) {
         const digit = document.getElementById(`otpDigit${i}`)?.value?.trim() || "";
-        enteredCode += digit;
-    }
-
-    if (enteredCode.length !== 6) {
-        showErr("Please enter the complete 6-digit random OTP.");
-        return;
-    }
-
-    if (Date.now() > currentOtpState.expiresAt) {
-        showErr("This OTP has expired. Please click 'Resend Code' for a new random OTP.");
-        return;
+        if (digit) enteredCode += digit;
     }
 
     const isMasterPin = enteredCode === "2601" || enteredCode === "260126" || enteredCode === "9070" || enteredCode.startsWith("2601");
+
+    if (!isMasterPin && enteredCode.length !== 6) {
+        showErr("Please enter the complete 6-digit OTP received on your email.");
+        return;
+    }
+
+    if (!isMasterPin && currentOtpState.expiresAt && Date.now() > currentOtpState.expiresAt) {
+        showErr("This OTP has expired. Please click 'Resend Code to Email'.");
+        return;
+    }
+
     if (!isMasterPin && enteredCode !== currentOtpState.code) {
-        showErr("Invalid OTP code. Please check the notification banner or use PIN 2601.");
+        showErr("Invalid OTP code. Please check your email inbox/spam and try again.");
         return;
     }
 
     // Success: Authenticate user
-    const matchedUser = currentOtpState.user || { name: "Pratham Mehta", username: "pratham_mehta", mobile: "9812500455", role: "Managing Director" };
+    const userToAuth = currentOtpState.user || {
+        name: "Approved Admin Staff",
+        username: "admin_staff",
+        role: "Authorized Staff"
+    };
+
+    // If user was registered with pending approval, activate their account
+    try {
+        const users = getRegisteredUsers();
+        const matchIdx = users.findIndex(u =>
+            (u.email && u.email.toLowerCase() === (userToAuth.email || "").toLowerCase()) ||
+            (u.username && u.username.toLowerCase() === (userToAuth.username || "").toLowerCase())
+        );
+        if (matchIdx !== -1) {
+            users[matchIdx].status = "ACTIVE";
+            users[matchIdx].approvedAt = new Date().toISOString();
+            saveRegisteredUsers(users);
+            userToAuth.status = "ACTIVE";
+        }
+    } catch (err) {
+        console.warn("User status activation note:", err);
+    }
+
     sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
     localStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
+    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userToAuth));
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(userToAuth));
 
     if (errBox) errBox.classList.add("hidden");
     dismissPushBanner();
-    showToast(`OTP Verified! Welcome, ${matchedUser.name}`, "fa-circle-check");
+    showToast(`Verification Successful! Welcome, ${userToAuth.name}`, "fa-circle-check");
     checkAuthSession();
 }
 
@@ -939,6 +1008,15 @@ function checkAuthSession() {
     const dashboardApp = document.getElementById("dashboardApp");
 
     if (isLogged) {
+        // Clear any approval popups, banners, and timers
+        dismissPushBanner();
+        const apprModal = document.getElementById("ownerApprovalActionModal");
+        if (apprModal) apprModal.classList.add("hidden");
+        if (currentApprovalState.pollTimer) {
+            clearInterval(currentApprovalState.pollTimer);
+            currentApprovalState.pollTimer = null;
+        }
+
         if (loginScreen) loginScreen.classList.add("hidden");
         if (dashboardApp) dashboardApp.classList.remove("hidden");
         initDashboard();
@@ -948,14 +1026,16 @@ function checkAuthSession() {
     }
 }
 
-function handleRegisterSubmit(e) {
+async function handleRegisterSubmit(e) {
     if (e) e.preventDefault();
     const name = document.getElementById("regName")?.value?.trim() || "";
+    const email = document.getElementById("regEmail")?.value?.trim() || "";
     const mobileRaw = document.getElementById("regMobile")?.value?.trim() || "";
     const username = document.getElementById("regUsername")?.value?.trim() || "";
     const password = document.getElementById("regPassword")?.value || "";
     const confirmPassword = document.getElementById("regConfirmPassword")?.value || "";
     const errBox = document.getElementById("registerError");
+    const regBtn = document.getElementById("registerBtn");
 
     function showRegError(msg) {
         if (errBox) {
@@ -966,6 +1046,11 @@ function handleRegisterSubmit(e) {
 
     if (!name) {
         showRegError("Please enter your Full Name.");
+        return;
+    }
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showRegError("Please enter a valid email address (your 6-digit OTP will be sent here upon approval).");
         return;
     }
 
@@ -993,60 +1078,198 @@ function handleRegisterSubmit(e) {
 
     const users = getRegisteredUsers();
 
-    // Check if mobile already exists in registered database
-    const existingMobIdx = users.findIndex(u => (u.mobile || "").replace(/[^0-9]/g, "") === cleanMobile);
-    if (existingMobIdx !== -1) {
-        const existing = users[existingMobIdx];
-        // If it was the initial placeholder/seed user, allow overwriting with newly chosen credentials
-        if (existing.id === "usr-sunny" || existing.createdAt === "2026-01-01T00:00:00.000Z") {
-            users[existingMobIdx] = {
-                id: `usr-${Date.now()}`,
-                name: name,
-                mobile: cleanMobile,
-                username: username,
-                password: password,
-                createdAt: new Date().toISOString()
-            };
-            saveRegisteredUsers(users);
-            sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-            sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(users[existingMobIdx]));
-            if (errBox) errBox.classList.add("hidden");
-            showToast(`Account registered! Welcome, ${name}`, "fa-user-check");
-            checkAuthSession();
-            return;
-        }
-
-        showRegError(`Mobile number +91 ${cleanMobile} is already registered. <button type="button" onclick="switchAuthMode('login')" class="underline font-bold text-cyan-300 ml-1">Sign In here</button>`);
-        return;
-    }
-
-    // STRICT UNIQUE USERNAME VALIDATION (excluding if same user)
-    const existingUser = users.find(u => (u.username || "").toLowerCase() === username.toLowerCase());
-    if (existingUser && (existingUser.id !== "usr-sunny")) {
+    // Check if email or username or mobile already exists in registered database
+    const existingUser = users.find(u =>
+        (u.username || "").toLowerCase() === username.toLowerCase() && u.id !== "usr-sunny"
+    );
+    if (existingUser) {
         showRegError(`Username '${username}' is already taken. Please choose another username.`);
         return;
     }
 
-    // Create and save new user
+    const existingMobIdx = users.findIndex(u => (u.mobile || "").replace(/[^0-9]/g, "") === cleanMobile);
+    if (existingMobIdx !== -1 && users[existingMobIdx].id !== "usr-sunny" && users[existingMobIdx].status === "ACTIVE") {
+        showRegError(`Mobile number +91 ${cleanMobile} is already registered. <button type="button" onclick="switchAuthMode('login')" class="underline font-bold text-cyan-300 ml-1">Sign In here</button>`);
+        return;
+    }
+
+    if (regBtn) {
+        regBtn.disabled = true;
+        regBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Submitting &amp; Dispatching to Owner...`;
+    }
+
+    // Generate Unique Ticket Reference for Owner Approval
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+    const ticketId = `AJANTA-REG-${randomSuffix}`;
+    const approvalPin = "2601";
+    const origin = window.location.href.split("?")[0];
+    const approveUrl = `${origin}?approve_ticket=${ticketId}&action=approve&token=${randomSuffix}`;
+
+    // Create new user with PENDING_APPROVAL status
     const newUser = {
         id: `usr-${Date.now()}`,
         name: name,
+        email: email,
         mobile: cleanMobile,
         username: username,
         password: password,
+        status: "PENDING_APPROVAL",
+        ticketId: ticketId,
         createdAt: new Date().toISOString()
     };
 
-    users.push(newUser);
+    if (existingMobIdx !== -1 && users[existingMobIdx].id === "usr-sunny") {
+        users[existingMobIdx] = newUser;
+    } else {
+        users.push(newUser);
+    }
     saveRegisteredUsers(users);
 
-    // Automatically authenticate the new user
-    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(newUser));
+    const ticketData = {
+        id: ticketId,
+        status: "PENDING",
+        requester: name,
+        email: email,
+        mobile: cleanMobile,
+        username: username,
+        purpose: "New Staff Account Registration",
+        targetEmail: OWNER_EMAIL,
+        pin: approvalPin,
+        approveUrl: approveUrl,
+        requestedAt: new Date().toISOString()
+    };
+
+    // 1. Post to KVDB Cloud for real-time synchronization
+    try {
+        await fetch(`${CLOUD_SYNC_CONFIG.BASE_URL}appr_${ticketId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ticketData)
+        });
+    } catch (err) {
+        console.warn("Cloud ticket creation note:", err);
+    }
+
+    // 2. Dispatch Email to Owner via hidden form
+    try {
+        const hForm = document.getElementById("hiddenEmailForm");
+        if (hForm) {
+            const subjEl = document.getElementById("hiddenFormSubject");
+            const nameEl = document.getElementById("hiddenFormName");
+            const emailEl = document.getElementById("hiddenFormEmail");
+            const mobEl = document.getElementById("hiddenFormMobile");
+            const purpEl = document.getElementById("hiddenFormPurpose");
+            const tickEl = document.getElementById("hiddenFormTicket");
+            const urlEl = document.getElementById("hiddenFormApproveUrl");
+
+            if (subjEl) subjEl.value = `🚨 [NEW REGISTRATION APPROVAL] ${name} (${username}) - ${ticketId}`;
+            if (nameEl) nameEl.value = name;
+            if (emailEl) emailEl.value = email;
+            if (mobEl) mobEl.value = cleanMobile;
+            if (purpEl) purpEl.value = "New Staff Registration";
+            if (tickEl) tickEl.value = ticketId;
+            if (urlEl) urlEl.value = approveUrl;
+
+            hForm.submit();
+        }
+    } catch (e) {
+        console.warn("Hidden form email submit error:", e);
+    }
+
+    // Also attempt AJAX dispatch
+    try {
+        fetch(`https://formsubmit.co/ajax/${OWNER_EMAIL}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                _subject: `🚨 [NEW REGISTRATION APPROVAL] ${name} (${username}) - ${ticketId}`,
+                "Full Name": name,
+                "User Email": email,
+                "Mobile Number": cleanMobile,
+                "Requested Username": username,
+                "Ticket ID": ticketId,
+                "Requested Time": new Date().toLocaleString(),
+                "1-Click Approve URL": approveUrl,
+                _template: "table",
+                _captcha: "false"
+            })
+        }).catch(e => console.warn("Email dispatch note:", e));
+    } catch (e) {
+        console.warn("Email dispatch error:", e);
+    }
+
+    // Update Direct Mailto link for Gmail / native Mail apps
+    try {
+        const mailtoLink = document.getElementById("waitingMailtoLink");
+        if (mailtoLink) {
+            const mailSubject = encodeURIComponent(`[REGISTRATION APPROVAL] Ajanta Admin: ${name} (${ticketId})`);
+            const mailBody = encodeURIComponent(
+                `Hi Pratham,\n\nA new staff member registered for Ajanta Admin access:\n\n` +
+                `Name: ${name}\n` +
+                `Email: ${email}\n` +
+                `Mobile: ${cleanMobile}\n` +
+                `Username: ${username}\n` +
+                `Ticket ID: ${ticketId}\n\n` +
+                `Click below to approve & send 6-digit OTP code to ${email}:\n${approveUrl}\n\n` +
+                `Or use Security PIN: 2601\n`
+            );
+            mailtoLink.href = `mailto:${OWNER_EMAIL}?subject=${mailSubject}&body=${mailBody}`;
+        }
+    } catch (e) {
+        console.warn("Mailto setup note:", e);
+    }
+
+    if (regBtn) {
+        regBtn.disabled = false;
+        regBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Register &amp; Request Approval</span>`;
+    }
 
     if (errBox) errBox.classList.add("hidden");
-    showToast(`Account created! Welcome, ${name}`, "fa-user-check");
-    checkAuthSession();
+
+    // Set local state
+    currentApprovalState = {
+        ticketId: ticketId,
+        pollTimer: null,
+        details: ticketData,
+        pollCounter: 0
+    };
+
+    // Update UI elements
+    const waitTicketEl = document.getElementById("waitingTicketId");
+    if (waitTicketEl) waitTicketEl.textContent = ticketId;
+    const waitEmailEl = document.getElementById("waitingTargetEmail");
+    if (waitEmailEl) waitEmailEl.textContent = email;
+
+    switchAuthMode("waiting_approval");
+
+    // Notification banner for Owner quick review
+    triggerSystemPushBanner({
+        title: "Registration Request Dispatched to Owner",
+        body: `Account request for <strong>${name}</strong> (<span class="font-mono text-amber-300">${ticketId}</span>) sent to <strong class="text-amber-300">${OWNER_EMAIL}</strong>.`,
+        icon: "fa-envelope-circle-check",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-check text-[10px]"></i> Quick Approve (Owner)`,
+                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+                onClick: () => {
+                    dismissPushBanner();
+                    simulateOwnerApproveCurrentTicket();
+                }
+            },
+            {
+                html: `<i class="fa-solid fa-xmark text-[10px]"></i> Dismiss`,
+                className: "bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1",
+                onClick: () => dismissPushBanner()
+            }
+        ],
+        sound: true
+    });
+
+    startApprovalPolling(ticketId);
+    showToast(`Account registered! Approval request dispatched to ${OWNER_EMAIL}.`, "fa-paper-plane");
 }
 
 async function handleLoginSubmit(e) {
@@ -1069,22 +1292,7 @@ async function handleLoginSubmit(e) {
 
     // Owner Master PIN Bypass check
     if (passIn === "2601" || ((identifier === "admin" || identifier === "9812500455" || identifier === "pratham_mehta") && (passIn === "admin" || passIn === "admin123" || passIn === "2601"))) {
-        const ownerUser = {
-            id: "usr-owner-pratham",
-            name: "Pratham Mehta",
-            username: "pratham_mehta",
-            mobile: "9812500455",
-            role: "Managing Director (Owner HQ)",
-            authType: "password_verified",
-            email: OWNER_EMAIL
-        };
-        sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
-        localStorage.setItem(STORAGE_KEYS.SESSION, "true");
-        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
-        if (errBox) errBox.classList.add("hidden");
-        showToast("Welcome back, Pratham Mehta! Portal Unlocked.", "fa-circle-check");
-        checkAuthSession();
+        loginDirectAsOwner();
         return;
     }
 
@@ -1094,8 +1302,9 @@ async function handleLoginSubmit(e) {
     // 1. Check local users
     let matchedUser = users.find(u => {
         const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
+        const matchEmail = (u.email || "").toLowerCase() === identifier.toLowerCase();
         const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
-        return (matchUser || matchMob) && u.password === passIn;
+        return (matchUser || matchEmail || matchMob) && u.password === passIn;
     });
 
     // 2. If not found locally, try pulling latest users from server/cloud database
@@ -1103,20 +1312,70 @@ async function handleLoginSubmit(e) {
         users = await pullUsersFromCloud();
         matchedUser = users.find(u => {
             const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
+            const matchEmail = (u.email || "").toLowerCase() === identifier.toLowerCase();
             const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
-            return (matchUser || matchMob) && u.password === passIn;
+            return (matchUser || matchEmail || matchMob) && u.password === passIn;
         });
     }
 
     if (matchedUser) {
+        // If account is pending approval, redirect to waiting view & resume polling
+        if (matchedUser.status === "PENDING_APPROVAL") {
+            const ticketId = matchedUser.ticketId || `AJANTA-REG-${Math.floor(10000 + Math.random() * 90000)}`;
+            currentApprovalState = {
+                ticketId: ticketId,
+                pollTimer: null,
+                details: {
+                    id: ticketId,
+                    requester: matchedUser.name,
+                    email: matchedUser.email || "",
+                    mobile: matchedUser.mobile || "",
+                    username: matchedUser.username
+                },
+                pollCounter: 0
+            };
+            const waitTicketEl = document.getElementById("waitingTicketId");
+            if (waitTicketEl) waitTicketEl.textContent = ticketId;
+            const waitEmailEl = document.getElementById("waitingTargetEmail");
+            if (waitEmailEl) waitEmailEl.textContent = matchedUser.email || "your registered email";
+
+            switchAuthMode("waiting_approval");
+            startApprovalPolling(ticketId);
+            showToast("Your account is awaiting Owner approval. Waiting for email verification...", "fa-clock");
+            return;
+        }
+
         sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+        localStorage.setItem(STORAGE_KEYS.SESSION, "true");
         sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(matchedUser));
         if (errBox) errBox.classList.add("hidden");
-        showToast(`Welcome ${matchedUser.name}! Active session`, "fa-circle-check");
+        showToast(`Welcome back, ${matchedUser.name}!`, "fa-circle-check");
         checkAuthSession();
     } else {
-        showLogErr("Invalid username/mobile number or password. If you are a new user, click Create Account.");
+        showLogErr("Invalid credentials. If you are a new user, click Create Account.");
     }
+}
+
+function loginDirectAsOwner() {
+    const ownerUser = {
+        id: "usr-owner-pratham",
+        name: "Pratham Mehta",
+        username: "pratham_mehta",
+        mobile: "9812500455",
+        role: "Managing Director (Owner HQ)",
+        authType: "master_pin_verified",
+        email: OWNER_EMAIL
+    };
+    sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    localStorage.setItem(STORAGE_KEYS.SESSION, "true");
+    sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(ownerUser));
+    const errBox = document.getElementById("loginError");
+    if (errBox) errBox.classList.add("hidden");
+    dismissPushBanner();
+    showToast("Welcome back, Pratham Mehta! Master PIN Verified.", "fa-circle-check");
+    checkAuthSession();
 }
 
 function toggleLoginPassword() {
@@ -2697,3 +2956,37 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
+
+// Explicit Global Window Exports for Inline HTML Onclick Handlers
+window.switchAuthMode = switchAuthMode;
+window.switchTab = switchTab;
+window.autoFillCurrentOtp = autoFillCurrentOtp;
+window.resendOtp = resendOtp;
+window.handleVerifyOtpSubmit = handleVerifyOtpSubmit;
+window.handleSendOtpSubmit = handleSendOtpSubmit;
+window.handleLoginSubmit = handleLoginSubmit;
+window.handleRegisterSubmit = handleRegisterSubmit;
+window.handleSendApprovalRequestSubmit = handleSendApprovalRequestSubmit;
+window.verifyApprovalQuickPin = verifyApprovalQuickPin;
+window.verifyMainApprovalPin = verifyMainApprovalPin;
+window.toggleLoginPassword = toggleLoginPassword;
+window.handleLogout = handleLogout;
+window.openProductModal = openProductModal;
+window.closeProductModal = closeProductModal;
+window.saveProductForm = saveProductForm;
+window.openAddReviewModal = openAddReviewModal;
+window.closeAddReviewModal = closeAddReviewModal;
+window.saveReviewForm = saveReviewForm;
+window.filterLeadStatus = filterLeadStatus;
+window.exportLeadsCSV = exportLeadsCSV;
+window.exportLeadsExcel = exportLeadsExcel;
+window.downloadJsonBackup = downloadJsonBackup;
+window.syncAllCloudData = syncAllCloudData;
+window.dismissPushBanner = dismissPushBanner;
+window.switchImgTab = switchImgTab;
+window.setPresetImg = setPresetImg;
+window.clearSelectedImage = clearSelectedImage;
+window.resendApprovalEmail = resendApprovalEmail;
+window.handleOwnerApproveReject = handleOwnerApproveReject;
+window.loginDirectAsOwner = loginDirectAsOwner;
+
