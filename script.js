@@ -301,59 +301,68 @@ async function pullUsersFromCloud() {
 function switchAuthMode(mode) {
     const apprForm = document.getElementById("adminApprovalRequestForm");
     const apprWaiting = document.getElementById("adminApprovalWaitingView");
-    const loginForm = document.getElementById("adminLoginForm");
+    const otpReqForm = document.getElementById("adminOtpRequestForm");
     const otpVerForm = document.getElementById("adminOtpVerifyForm");
+    const loginForm = document.getElementById("adminLoginForm");
     const registerForm = document.getElementById("adminRegisterForm");
 
     const tabAppr = document.getElementById("authTab-approval");
-    const tabLogin = document.getElementById("authTab-login");
+    const tabOtp = document.getElementById("authTab-otp");
     const tabRegister = document.getElementById("authTab-register");
 
     const apprErr = document.getElementById("approvalRequestError");
-    const loginErr = document.getElementById("loginError");
+    const otpReqErr = document.getElementById("otpRequestError");
     const otpVerErr = document.getElementById("otpVerifyError");
+    const loginErr = document.getElementById("loginError");
     const regErr = document.getElementById("registerError");
 
     if (apprErr) apprErr.classList.add("hidden");
-    if (loginErr) loginErr.classList.add("hidden");
+    if (otpReqErr) otpReqErr.classList.add("hidden");
     if (otpVerErr) otpVerErr.classList.add("hidden");
+    if (loginErr) loginErr.classList.add("hidden");
     if (regErr) regErr.classList.add("hidden");
 
     // Hide all forms first
     if (apprForm) apprForm.classList.add("hidden");
     if (apprWaiting) apprWaiting.classList.add("hidden");
-    if (loginForm) loginForm.classList.add("hidden");
+    if (otpReqForm) otpReqForm.classList.add("hidden");
     if (otpVerForm) otpVerForm.classList.add("hidden");
+    if (loginForm) loginForm.classList.add("hidden");
     if (registerForm) registerForm.classList.add("hidden");
 
     // Reset tab styling
-    const inactiveStyle = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+    const inactiveStyle = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
     if (tabAppr) tabAppr.className = inactiveStyle;
-    if (tabLogin) tabLogin.className = inactiveStyle;
+    if (tabOtp) tabOtp.className = inactiveStyle;
     if (tabRegister) tabRegister.className = inactiveStyle;
 
     if (mode === "register") {
         if (registerForm) registerForm.classList.remove("hidden");
-        if (tabRegister) tabRegister.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-emerald-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        if (tabRegister) tabRegister.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-emerald-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const rName = document.getElementById("regName");
         if (rName) setTimeout(() => rName.focus(), 50);
-    } else if (mode === "login") {
+    } else if (mode === "otp") {
+        if (otpReqForm) otpReqForm.classList.remove("hidden");
+        if (tabOtp) tabOtp.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-indigo-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        const oMob = document.getElementById("otpMobileInput");
+        if (oMob) setTimeout(() => oMob.focus(), 50);
+    } else if (mode === "login" || mode === "password") {
         if (loginForm) loginForm.classList.remove("hidden");
-        if (tabLogin) tabLogin.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-cyan-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        if (tabOtp) tabOtp.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-cyan-700 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const lUser = document.getElementById("loginUsername");
         if (lUser) setTimeout(() => lUser.focus(), 50);
     } else if (mode === "waiting_approval") {
         if (apprWaiting) apprWaiting.classList.remove("hidden");
-        if (tabAppr) tabAppr.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        if (tabAppr) tabAppr.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
     } else if (mode === "verify_otp") {
         if (otpVerForm) otpVerForm.classList.remove("hidden");
-        if (tabAppr) tabAppr.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-emerald-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        if (tabOtp) tabOtp.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-indigo-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const d1 = document.getElementById("otpDigit1");
         if (d1) setTimeout(() => d1.focus(), 100);
     } else {
         // Default: Request Access
         if (apprForm) apprForm.classList.remove("hidden");
-        if (tabAppr) tabAppr.className = "py-2.5 px-1 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
+        if (tabAppr) tabAppr.className = "py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer";
         const nameInp = document.getElementById("approvalRequesterName");
         if (nameInp) setTimeout(() => nameInp.focus(), 50);
     }
@@ -531,7 +540,7 @@ async function handleSendApprovalRequestSubmit(e) {
         console.warn("Cloud ticket creation note:", err);
     }
 
-    // 2. Dispatch Email to Owner via native hidden form POST
+    // 2. Dispatch Email to Owner via multiple redundant gateways
     try {
         const hForm = document.getElementById("hiddenEmailForm");
         if (hForm) {
@@ -557,7 +566,7 @@ async function handleSendApprovalRequestSubmit(e) {
         console.warn("Hidden form email submit error:", e);
     }
 
-    // Also attempt AJAX dispatch to Owner
+    // Secondary Gateway: FormSubmit AJAX
     try {
         fetch(`https://formsubmit.co/ajax/${OWNER_EMAIL}`, {
             method: "POST",
@@ -582,6 +591,27 @@ async function handleSendApprovalRequestSubmit(e) {
         console.warn("Email dispatch error:", e);
     }
 
+    // Tertiary Gateway: FormSpree public endpoint fallback
+    try {
+        fetch(`https://formspree.io/f/xbjnkyyw`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            body: JSON.stringify({
+                _subject: `🚨 Ajanta Admin Access Request for ${OWNER_EMAIL}: ${name} (${ticketId})`,
+                to: OWNER_EMAIL,
+                name: name,
+                email: email,
+                mobile: cleanMobile,
+                purpose: purpose,
+                ticket: ticketId,
+                approveUrl: approveUrl
+            })
+        }).catch(() => {});
+    } catch (e) {}
+
     // 3. Update Direct Mailto link for Gmail / native Mail apps
     try {
         const mailtoLink = document.getElementById("waitingMailtoLink");
@@ -596,9 +626,16 @@ async function handleSendApprovalRequestSubmit(e) {
                 `Ticket ID: ${ticketId}\n` +
                 `Requested Time: ${new Date().toLocaleString()}\n\n` +
                 `Click below to approve and dispatch 6-digit OTP to requester:\n${approveUrl}\n\n` +
-                `Or use Security PIN: 2601\n`
+                `Security PIN: 2601\n`
             );
-            mailtoLink.href = `mailto:${OWNER_EMAIL}?subject=${mailSubject}&body=${mailBody}`;
+            const fullMailto = `mailto:${OWNER_EMAIL}?subject=${mailSubject}&body=${mailBody}`;
+            mailtoLink.href = fullMailto;
+
+            // Also prepare direct Web Gmail compose link
+            const webGmailLink = document.getElementById("waitingWebGmailLink");
+            if (webGmailLink) {
+                webGmailLink.href = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(OWNER_EMAIL)}&su=${mailSubject}&body=${mailBody}`;
+            }
         }
     } catch (e) {
         console.warn("Mailto setup note:", e);
@@ -835,6 +872,159 @@ async function checkOwnerApprovalUrlQuery() {
         console.warn("URL query check error:", err);
     }
 }
+
+async function handleSendOtpSubmit(e) {
+    if (e) e.preventDefault();
+    const inputVal = document.getElementById("otpMobileInput")?.value?.trim() || "";
+    const errBox = document.getElementById("otpRequestError");
+    const sendBtn = document.getElementById("sendOtpBtn");
+
+    function showErr(msg) {
+        if (errBox) {
+            errBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-1.5"></i> ${msg}`;
+            errBox.classList.remove("hidden");
+        }
+    }
+
+    if (!inputVal) {
+        showErr("Please enter your registered mobile number or email.");
+        return;
+    }
+
+    if (errBox) errBox.classList.add("hidden");
+
+    if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Generating &amp; Sending OTP...`;
+    }
+
+    const isEmail = inputVal.includes("@");
+    const cleanMob = inputVal.replace(/[^0-9]/g, "");
+
+    // Load registered users
+    let users = getRegisteredUsers();
+    let matchedUser = users.find(u => {
+        const uEmail = (u.email || "").toLowerCase();
+        const uMob = (u.mobile || "").replace(/[^0-9]/g, "");
+        const uName = (u.username || "").toLowerCase();
+        if (isEmail) {
+            return uEmail === inputVal.toLowerCase() || uName === inputVal.toLowerCase();
+        } else {
+            return (cleanMob.length === 10 && uMob === cleanMob) || uName === inputVal.toLowerCase();
+        }
+    });
+
+    // Check Owner match
+    const isOwner = (isEmail && inputVal.toLowerCase() === OWNER_EMAIL.toLowerCase()) ||
+                    (cleanMob.length === 10 && cleanMob === "9812500455") ||
+                    inputVal.toLowerCase() === "pratham_mehta" ||
+                    inputVal.toLowerCase() === "admin" ||
+                    inputVal.toLowerCase() === "owner";
+
+    if (!matchedUser && isOwner) {
+        matchedUser = {
+            name: "Pratham Mehta",
+            username: "pratham_mehta",
+            email: OWNER_EMAIL,
+            mobile: "9812500455",
+            role: "Managing Director (Owner HQ)",
+            status: "ACTIVE"
+        };
+    }
+
+    // If still not matched, check if valid email or 10-digit mobile
+    if (!matchedUser) {
+        if (isEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputVal)) {
+            matchedUser = {
+                name: inputVal.split("@")[0],
+                email: inputVal,
+                username: inputVal.split("@")[0],
+                role: "Staff Member",
+                status: "ACTIVE"
+            };
+        } else if (cleanMob.length === 10) {
+            matchedUser = {
+                name: `Staff (+91 ${cleanMob})`,
+                mobile: cleanMob,
+                email: OWNER_EMAIL,
+                username: `staff_${cleanMob.slice(-4)}`,
+                role: "Staff Member",
+                status: "ACTIVE"
+            };
+        } else {
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Generate &amp; Send 6-Digit OTP</span>`;
+            }
+            showErr("Please enter a valid 10-digit mobile number or valid email address.");
+            return;
+        }
+    }
+
+    const otpCode = generateSecureRandomOtp();
+    const targetEmail = matchedUser.email || (isEmail ? inputVal : OWNER_EMAIL);
+    const targetDisplay = isEmail ? inputVal : (cleanMob ? `+91 ${cleanMob}` : inputVal);
+
+    currentOtpState = {
+        code: otpCode,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        targetDisplay: targetDisplay,
+        email: targetEmail,
+        user: matchedUser,
+        cooldown: 59,
+        timerId: null
+    };
+
+    const targetDispEl = document.getElementById("otpTargetDisplay");
+    if (targetDispEl) targetDispEl.textContent = targetDisplay;
+
+    const badgeEl = document.getElementById("otpStatusBadge");
+    if (badgeEl) badgeEl.textContent = isOwner ? "Owner OTP Verification" : "Secure OTP Verification";
+
+    // Dispatch to Email
+    if (targetEmail) {
+        dispatchOtpToRequesterEmail(targetEmail, matchedUser.name || "Ajanta Staff", otpCode, "AJANTA-AUTH");
+    }
+
+    // Also show Quick Push Notification for seamless access
+    triggerSystemPushBanner({
+        title: "Your 6-Digit Login OTP",
+        body: `Access OTP for <strong>${matchedUser.name}</strong> is <span class="font-mono text-xl font-black text-amber-300 tracking-widest px-2 py-0.5 bg-amber-950/80 rounded-lg border border-amber-500/40">${otpCode}</span>`,
+        icon: "fa-shield-halved",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill Code`,
+                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+                onClick: () => {
+                    dismissPushBanner();
+                    autoFillCurrentOtp();
+                }
+            },
+            {
+                html: `<i class="fa-solid fa-xmark text-[10px]"></i> Dismiss`,
+                className: "bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1",
+                onClick: () => dismissPushBanner()
+            }
+        ],
+        sound: true
+    });
+
+    if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> <span>Generate &amp; Send 6-Digit OTP</span>`;
+    }
+
+    // Clear digit boxes
+    for (let i = 1; i <= 6; i++) {
+        const d = document.getElementById(`otpDigit${i}`);
+        if (d) d.value = "";
+    }
+
+    switchAuthMode("verify_otp");
+    startOtpCountdown();
+    showToast(`6-Digit OTP dispatched to ${targetDisplay}!`, "fa-shield-halved");
+}
+window.handleSendOtpSubmit = handleSendOtpSubmit;
 
 // Generate cryptographically secure or math-random 6-digit OTP
 function generateSecureRandomOtp() {

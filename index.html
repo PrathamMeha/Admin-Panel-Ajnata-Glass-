@@ -52,8 +52,9 @@
     <!-- ==========================================================================
          1. SECURE ADMIN LOGIN SCREEN (SHOWN WHEN NOT AUTHENTICATED)
          ========================================================================== -->
-    <div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl">
-        <div class="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+    <div id="loginScreen" class="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 backdrop-blur-xl">
+        <div class="min-h-full flex items-center justify-center p-3 sm:p-6 py-6">
+            <div class="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl relative my-auto">
             <!-- Decorative gradient blur -->
             <div class="absolute -top-24 -right-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -66,15 +67,15 @@
                 <p class="text-xs text-slate-400 mt-1">Secure portal for products, leads & catalog</p>
             </div>
 
-            <!-- Auth Mode Switch Tabs (3 Clear Options: Approval Request, Password/PIN, Register) -->
+            <!-- Auth Mode Switch Tabs (3 Clear Options: Approval Request, OTP Login, Register) -->
             <div class="grid grid-cols-3 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 mb-6 gap-1.5">
                 <button type="button" onclick="switchAuthMode('approval')" id="authTab-approval" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition bg-amber-600 text-white shadow flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
                     <i class="fa-solid fa-envelope-circle-check text-xs"></i>
                     <span>Request Access</span>
                 </button>
-                <button type="button" onclick="switchAuthMode('login')" id="authTab-login" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
-                    <i class="fa-solid fa-lock text-xs"></i>
-                    <span>Password / PIN</span>
+                <button type="button" onclick="switchAuthMode('otp')" id="authTab-otp" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-mobile-screen-button text-xs"></i>
+                    <span>Login with OTP</span>
                 </button>
                 <button type="button" onclick="switchAuthMode('register')" id="authTab-register" class="py-2.5 px-1.5 rounded-xl text-[11px] font-bold transition text-slate-400 hover:text-white flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer">
                     <i class="fa-solid fa-user-plus text-xs"></i>
@@ -139,15 +140,22 @@
                     <span>Send Approval Request to Owner Email</span>
                 </button>
 
-                <!-- Quick Master PIN Unlock on main view (Owner bypass) -->
-                <div class="pt-2 border-t border-slate-800/60 mt-3 flex items-center gap-2">
-                    <div class="relative flex-1">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-key"></i></span>
-                        <input type="password" id="approvalInitialPin" placeholder="Owner Security PIN (e.g. 2601)" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none placeholder-slate-600">
+                <!-- Owner Quick Security PIN Unlock (Bypass Approval) -->
+                <div class="pt-3 border-t border-slate-800/80 mt-3.5">
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-key text-cyan-400"></i>
+                        <span>Owner Security PIN Unlock</span>
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <div class="relative flex-1">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400 text-xs"><i class="fa-solid fa-lock"></i></span>
+                            <input type="password" id="approvalInitialPin" placeholder="Enter Security PIN" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyMainApprovalPin();}" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-8 pr-3 py-2.5 text-xs text-white focus:outline-none placeholder-slate-600 transition">
+                        </div>
+                        <button type="button" onclick="verifyMainApprovalPin()" class="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer whitespace-nowrap shadow shadow-cyan-950/40 flex items-center gap-1.5">
+                            <i class="fa-solid fa-unlock-keyhole"></i>
+                            <span>Instant Unlock</span>
+                        </button>
                     </div>
-                    <button type="button" onclick="verifyMainApprovalPin()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs transition cursor-pointer whitespace-nowrap">
-                        Instant Unlock
-                    </button>
                 </div>
             </form>
 
@@ -201,27 +209,37 @@
                     <span>As soon as the Owner approves, your 6-digit Login OTP will be dispatched to your email and this screen will transition to the verification step.</span>
                 </div>
 
-                <!-- Instant Owner Quick-Approve for Testing / Direct device -->
+                <!-- Instant Owner Quick-Approve / PIN Bypass -->
                 <div class="p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-2xl space-y-2 text-left">
                     <div class="flex items-center justify-between">
-                        <span class="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                        <span class="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
                             <i class="fa-solid fa-key text-[10px]"></i> Owner PIN Unlock (Bypass Waiting):
                         </span>
                     </div>
                     <div class="flex gap-2">
-                        <input type="password" id="approvalQuickPin" placeholder="Enter PIN 2601" class="flex-1 bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
-                        <button type="button" onclick="verifyApprovalQuickPin()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer">
-                            Unlock
+                        <input type="password" id="approvalQuickPin" placeholder="Enter Security PIN" onkeydown="if(event.key==='Enter'){event.preventDefault();verifyApprovalQuickPin();}" class="flex-1 bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none placeholder-slate-600 transition">
+                        <button type="button" onclick="verifyApprovalQuickPin()" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition cursor-pointer flex items-center gap-1">
+                            <i class="fa-solid fa-unlock-keyhole text-[10px]"></i> Unlock
                         </button>
                     </div>
                 </div>
 
                 <!-- Direct Email Dispatch Fallback (Opens Gmail / Mail App) -->
-                <div class="space-y-1.5 pt-1">
-                    <a id="waitingMailtoLink" href="#" target="_blank" class="w-full bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 hover:text-white border border-amber-500/40 font-bold px-3 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer">
-                        <i class="fa-solid fa-paper-plane text-amber-400"></i>
-                        <span>Send / Open in Gmail App</span>
-                    </a>
+                <div class="space-y-2 pt-1">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <a id="waitingMailtoLink" href="#" target="_blank" class="bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 hover:text-white border border-amber-500/40 font-bold px-3 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer">
+                            <i class="fa-solid fa-paper-plane text-amber-400"></i>
+                            <span>Open Mail / Gmail App</span>
+                        </a>
+                        <a id="waitingWebGmailLink" href="https://mail.google.com" target="_blank" class="bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700 font-bold px-3 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer">
+                            <i class="fa-brands fa-google text-rose-400"></i>
+                            <span>Open Web Gmail</span>
+                        </a>
+                    </div>
+                    <div class="text-[11px] text-slate-400 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80 flex items-start gap-2 text-left">
+                        <i class="fa-solid fa-lightbulb text-amber-400 mt-0.5 shrink-0"></i>
+                        <span>Agar primary inbox me mail na dikhe, toh <strong>Spam / Junk</strong> folder ya <strong>Updates / Promotions</strong> tab check karein. Ya fir upar diye gaye <strong>Owner PIN Unlock</strong> se turant portal open kar sakte hain.</span>
+                    </div>
                 </div>
 
                 <div class="flex items-center justify-between pt-1">
@@ -262,29 +280,60 @@
                 <input type="hidden" name="_template" value="table">
             </form>
 
-            <!-- 1. SIGN IN FORM (PASSWORD / PIN) -->
-            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
-                <div class="p-3 bg-slate-900/60 border border-slate-800 rounded-2xl flex items-start gap-2.5 text-slate-300 text-xs">
-                    <i class="fa-solid fa-key text-cyan-400 text-base shrink-0 mt-0.5"></i>
+            <!-- 1. OTP REQUEST FORM (Primary Sign In) -->
+            <form id="adminOtpRequestForm" onsubmit="handleSendOtpSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
+                <div class="p-3.5 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl flex items-start gap-3 text-slate-300 text-xs">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-900/60 border border-indigo-500/40 text-indigo-400 flex items-center justify-center shrink-0 text-sm mt-0.5 shadow">
+                        <i class="fa-solid fa-mobile-screen-button"></i>
+                    </div>
                     <div>
-                        <span class="font-bold text-white block">Direct Login</span>
-                        <span class="text-slate-400 text-[11px]">Owner Master PIN: <strong class="text-cyan-300 font-mono">2601</strong>. Approved staff can log in using their username and password.</span>
+                        <span class="font-bold text-white block text-[13px]">Sign In with OTP</span>
+                        <span class="text-slate-300 text-[11px] leading-relaxed block mt-0.5">
+                            Enter your registered mobile or email to receive a secure 6-digit verification code.
+                        </span>
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Username, Mobile or "Owner"</label>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Registered Mobile Number or Email *</label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-user-check"></i></span>
+                        <input type="text" id="otpMobileInput" required autocomplete="off" placeholder="Enter 10-digit mobile or email address" class="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div id="otpRequestError" class="hidden text-xs text-rose-400 bg-rose-950/40 border border-rose-800/30 p-2.5 rounded-xl text-center font-medium"></div>
+
+                <button type="submit" id="sendOtpBtn" class="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-bold py-3.5 px-4 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shadow-indigo-950/50 flex items-center justify-center gap-2 cursor-pointer mt-1">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Generate &amp; Send 6-Digit OTP</span>
+                </button>
+
+                <div class="flex items-center justify-between text-[11px] pt-1">
+                    <button type="button" onclick="switchAuthMode('login')" class="text-cyan-400 hover:text-cyan-300 transition font-semibold cursor-pointer">
+                        <i class="fa-solid fa-lock mr-1"></i> Sign In with Password
+                    </button>
+                    <button type="button" onclick="switchAuthMode('approval')" class="text-amber-400 hover:text-amber-300 transition font-semibold cursor-pointer">
+                        <i class="fa-solid fa-shield-halved mr-1"></i> Request Access
+                    </button>
+                </div>
+            </form>
+
+            <!-- 1.5. SIGN IN FORM (PASSWORD / PIN) -->
+            <form id="adminLoginForm" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-4 relative hidden">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Username, Mobile or Email</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-user"></i></span>
-                        <input type="text" id="loginUsername" required autocomplete="off" placeholder="Enter username, mobile or owner" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="text" id="loginUsername" required autocomplete="off" placeholder="Enter username, mobile or email" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-4 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Password / Security PIN</label>
+                    <label class="block text-xs font-bold text-slate-300 mb-1.5">Password</label>
                     <div class="relative">
                         <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"><i class="fa-solid fa-lock"></i></span>
-                        <input type="password" id="loginPassword" required autocomplete="new-password" placeholder="Enter password or Master PIN (2601)" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
+                        <input type="password" id="loginPassword" required autocomplete="new-password" placeholder="Enter your password" class="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl pl-9 pr-10 py-3 text-xs text-white placeholder-slate-600 focus:outline-none transition">
                         <button type="button" onclick="toggleLoginPassword()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs">
                             <i id="loginPassIcon" class="fa-regular fa-eye"></i>
                         </button>
@@ -299,11 +348,11 @@
                 </button>
 
                 <div class="flex items-center justify-between text-[11px] pt-1">
-                    <button type="button" onclick="switchAuthMode('approval')" class="text-amber-400 hover:text-amber-300 transition font-semibold cursor-pointer">
-                        <i class="fa-solid fa-envelope mr-1"></i> Request Access Approval
+                    <button type="button" onclick="switchAuthMode('otp')" class="text-indigo-400 hover:text-indigo-300 transition font-semibold cursor-pointer">
+                        <i class="fa-solid fa-mobile-screen mr-1"></i> Sign In with OTP
                     </button>
-                    <button type="button" onclick="switchAuthMode('register')" class="text-emerald-400 hover:text-emerald-300 transition font-semibold cursor-pointer">
-                        <i class="fa-solid fa-user-plus mr-1"></i> Register Account
+                    <button type="button" onclick="switchAuthMode('approval')" class="text-amber-400 hover:text-amber-300 transition font-semibold cursor-pointer">
+                        <i class="fa-solid fa-shield-halved mr-1"></i> Request Access
                     </button>
                 </div>
             </form>
@@ -314,10 +363,10 @@
                     <div class="w-12 h-12 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-lg mx-auto mb-2 shadow-lg shadow-emerald-500/20">
                         <i class="fa-solid fa-envelope-circle-check"></i>
                     </div>
-                    <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold">
-                        <i class="fa-solid fa-circle-check"></i> Owner Approved
+                    <div id="otpBadgeContainer" class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold">
+                        <i class="fa-solid fa-shield-check"></i> <span id="otpStatusBadge">Secure OTP Verification</span>
                     </div>
-                    <h3 class="text-sm font-bold text-white mt-1">Enter 6-Digit Email OTP</h3>
+                    <h3 class="text-sm font-bold text-white mt-1">Enter 6-Digit OTP Code</h3>
                     <p class="text-[11px] text-slate-400">Verification code sent to <span id="otpTargetDisplay" class="font-bold text-amber-300 font-mono"></span></p>
                 </div>
 
@@ -340,7 +389,7 @@
                     </button>
                     <span id="otpCountdownText" class="text-slate-500 font-mono text-[11px]">Resend in 59s</span>
                     <button type="button" id="resendOtpBtn" onclick="resendOtpToEmail()" class="text-amber-400 hover:text-amber-300 font-bold hidden cursor-pointer">
-                        Resend Code to Email
+                        Resend Code
                     </button>
                 </div>
 
@@ -350,11 +399,11 @@
                 </button>
 
                 <div class="flex items-center justify-between pt-1">
-                    <button type="button" onclick="switchAuthMode('approval')" class="text-[11px] text-slate-400 hover:text-white transition">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to Request
+                    <button type="button" onclick="switchAuthMode('otp')" class="text-[11px] text-slate-400 hover:text-white transition cursor-pointer">
+                        <i class="fa-solid fa-arrow-left mr-1"></i> Back to OTP
                     </button>
-                    <button type="button" onclick="switchAuthMode('login')" class="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold transition">
-                        Owner PIN Login <i class="fa-solid fa-arrow-right ml-1"></i>
+                    <button type="button" onclick="switchAuthMode('login')" class="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold transition cursor-pointer">
+                        Sign In with Password <i class="fa-solid fa-arrow-right ml-1"></i>
                     </button>
                 </div>
             </form>
@@ -421,6 +470,7 @@
             </form>
         </div>
     </div>
+</div>
 
     <!-- FLOATING PUSH NOTIFICATION ALERT BAR (FOR OTP & BROADCASTS) -->
     <div id="systemPushBanner" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-lg bg-slate-900/95 border border-cyan-500/50 p-4 rounded-2xl shadow-2xl backdrop-blur-xl transform -translate-y-32 opacity-0 transition-all duration-300 flex items-start gap-3">
