@@ -26,9 +26,26 @@ const DEFAULT_USERS = [
         id: "usr-owner-pratham",
         name: "Pratham Mehta",
         username: "pratham_mehta",
+        email: "mehtapratham907@gmail.com",
         mobile: "9812500455",
         password: "2601",
         role: "Managing Director (Owner HQ)",
+        allowedTab: "ALL",
+        isMasterUnlocked: true,
+        createdAt: "2026-01-01T00:00:00.000Z"
+    },
+    {
+        id: "usr-sunny-master",
+        name: "Sunny Mehta",
+        username: "Sunny",
+        email: "mehtapratham907@gmail.com",
+        mobile: "9215400355",
+        password: "0650",
+        role: "Master HQ",
+        designation: "Master HQ",
+        allowedTab: "ALL",
+        isMasterUnlocked: true,
+        status: "ACTIVE",
         createdAt: "2026-01-01T00:00:00.000Z"
     },
     {
@@ -38,15 +55,7 @@ const DEFAULT_USERS = [
         mobile: "9812500455",
         password: "admin",
         role: "Managing Director",
-        createdAt: "2026-01-01T00:00:00.000Z"
-    },
-    {
-        id: "usr-admin-default-pass",
-        name: "Pratham Mehta",
-        username: "admin",
-        mobile: "9812500455",
-        password: "admin123",
-        role: "Managing Director",
+        allowedTab: "ALL",
         createdAt: "2026-01-01T00:00:00.000Z"
     }
 ];
@@ -77,6 +86,52 @@ let currentOtpState = {
     timerId: null,
     cooldown: 0
 };
+
+function saveCurrentOtpState(state) {
+    currentOtpState = state;
+    try {
+        localStorage.setItem("AJANTA_OTP_STATE", JSON.stringify({
+            code: state.code,
+            expiresAt: state.expiresAt,
+            targetDisplay: state.targetDisplay,
+            email: state.email,
+            user: state.user,
+            pendingNewUser: state.pendingNewUser
+        }));
+    } catch (e) {}
+}
+
+function loadCurrentOtpState() {
+    if (currentOtpState && currentOtpState.code) return currentOtpState;
+    try {
+        const stored = localStorage.getItem("AJANTA_OTP_STATE");
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+                currentOtpState = Object.assign(currentOtpState || {}, parsed);
+                return currentOtpState;
+            }
+        }
+    } catch (e) {}
+    return currentOtpState;
+}
+
+function clearCurrentOtpState() {
+    if (currentOtpState && currentOtpState.timerId) {
+        clearInterval(currentOtpState.timerId);
+    }
+    currentOtpState = {
+        code: "",
+        user: null,
+        targetDisplay: "",
+        expiresAt: 0,
+        timerId: null,
+        cooldown: 0
+    };
+    try {
+        localStorage.removeItem("AJANTA_OTP_STATE");
+    } catch (e) {}
+}
 
 // Web Audio API Chime Synthesizer
 function playChimeSound(type = "alert") {
@@ -245,16 +300,51 @@ const DEFAULT_REVIEWS = [
 // ==========================================
 
 function getRegisteredUsers() {
+    let users = [];
     try {
         const stored = localStorage.getItem(STORAGE_KEYS.USERS);
         if (stored) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            if (Array.isArray(parsed) && parsed.length > 0) users = parsed;
         }
     } catch (e) {
         console.warn("Registered users read failed:", e);
     }
-    return DEFAULT_USERS;
+    if (!users || users.length === 0) {
+        users = [...DEFAULT_USERS];
+    }
+
+    // Ensure Sunny Mehta has Master HQ role (NOT Primary Owner)
+    let sunnyIdx = users.findIndex(u =>
+        (u.username || "").toLowerCase() === "sunny" ||
+        (u.mobile || "").replace(/[^0-9]/g, "") === "9215400355"
+    );
+    if (sunnyIdx !== -1) {
+        users[sunnyIdx].role = "Master HQ";
+        users[sunnyIdx].designation = "Master HQ";
+        users[sunnyIdx].allowedTab = "ALL";
+        users[sunnyIdx].isMasterUnlocked = true;
+        users[sunnyIdx].password = "0650";
+        if (!users[sunnyIdx].email) users[sunnyIdx].email = "mehtapratham907@gmail.com";
+        if (!users[sunnyIdx].name) users[sunnyIdx].name = "Sunny Mehta";
+    } else {
+        users.push({
+            id: "usr-sunny-master",
+            name: "Sunny Mehta",
+            username: "Sunny",
+            email: "mehtapratham907@gmail.com",
+            mobile: "9215400355",
+            password: "0650",
+            role: "Master HQ",
+            designation: "Master HQ",
+            allowedTab: "ALL",
+            isMasterUnlocked: true,
+            status: "ACTIVE",
+            createdAt: "2026-01-01T00:00:00.000Z"
+        });
+    }
+
+    return users;
 }
 
 function saveRegisteredUsers(users) {
@@ -270,10 +360,30 @@ function saveRegisteredUsers(users) {
 async function syncUsersToCloud(users) {
     try {
         const endpoint = `${CLOUD_SYNC_CONFIG.BASE_URL}${CLOUD_SYNC_CONFIG.USERS_KEY}`;
+        let remoteUsers = [];
+        try {
+            const res = await fetch(endpoint).catch(() => null);
+            if (res && res.ok) {
+                remoteUsers = await res.json().catch(() => []);
+            }
+        } catch (e) {}
+        if (!Array.isArray(remoteUsers)) remoteUsers = [];
+
+        const mergedMap = new Map();
+        remoteUsers.forEach(u => {
+            const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
+            if (key) mergedMap.set(key, u);
+        });
+        users.forEach(u => {
+            const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
+            if (key) mergedMap.set(key, u);
+        });
+        const finalUsers = Array.from(mergedMap.values());
+
         await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(users)
+            body: JSON.stringify(finalUsers)
         });
     } catch (e) {
         console.warn("Background user cloud sync:", e);
@@ -289,9 +399,44 @@ async function pullUsersFromCloud() {
             if (Array.isArray(remoteUsers) && remoteUsers.length > 0) {
                 const localUsers = getRegisteredUsers();
                 const mergedMap = new Map();
-                localUsers.forEach(u => mergedMap.set((u.mobile || u.username), u));
-                remoteUsers.forEach(u => mergedMap.set((u.mobile || u.username), u));
+                localUsers.forEach(u => {
+                    const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
+                    if (key) mergedMap.set(key, u);
+                });
+                remoteUsers.forEach(u => {
+                    const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
+                    if (key) mergedMap.set(key, u);
+                });
                 const merged = Array.from(mergedMap.values());
+                // Guarantee Sunny Master HQ credentials in merged set
+                const sunnyInMerged = merged.find(u => (u.username || "").toLowerCase() === "sunny" || (u.mobile || "").replace(/[^0-9]/g, "") === "9215400355");
+                if (sunnyInMerged) {
+                    sunnyInMerged.name = "Sunny Mehta";
+                    sunnyInMerged.username = "Sunny";
+                    sunnyInMerged.password = "0650";
+                    sunnyInMerged.role = "Master HQ";
+                    sunnyInMerged.designation = "Master HQ";
+                    sunnyInMerged.allowedTab = "ALL";
+                    sunnyInMerged.isMasterUnlocked = true;
+                    sunnyInMerged.email = "mehtapratham907@gmail.com";
+                    sunnyInMerged.mobile = "9215400355";
+                    sunnyInMerged.status = "ACTIVE";
+                } else {
+                    merged.push({
+                        id: "usr-sunny-master",
+                        name: "Sunny Mehta",
+                        username: "Sunny",
+                        email: "mehtapratham907@gmail.com",
+                        mobile: "9215400355",
+                        password: "0650",
+                        role: "Master HQ",
+                        designation: "Master HQ",
+                        allowedTab: "ALL",
+                        isMasterUnlocked: true,
+                        status: "ACTIVE",
+                        createdAt: "2026-01-01T00:00:00.000Z"
+                    });
+                }
                 localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(merged));
                 return merged;
             }
@@ -746,7 +891,7 @@ function transitionToEmailOtpVerification(ticketData) {
     const username = ticketData?.username || currentApprovalState.details?.username || (email ? email.split("@")[0] : "admin");
     const otpCode = ticketData?.otpCode || currentApprovalState.details?.otpCode || generateSecureRandomOtp();
 
-    currentOtpState = {
+    saveCurrentOtpState({
         code: otpCode,
         email: email,
         user: {
@@ -762,7 +907,7 @@ function transitionToEmailOtpVerification(ticketData) {
         expiresAt: Date.now() + 10 * 60 * 1000,
         cooldown: 59,
         timerId: null
-    };
+    });
 
     const targetDispEl = document.getElementById("otpTargetDisplay");
     if (targetDispEl) targetDispEl.textContent = currentOtpState.targetDisplay;
@@ -907,8 +1052,12 @@ async function handleSendOtpSubmit(e) {
     const isEmail = inputVal.includes("@");
     const cleanMob = inputVal.replace(/[^0-9]/g, "");
 
-    // Load registered users
-    let users = getRegisteredUsers();
+    // 1. Fetch latest users from Cloud Database
+    let users = await pullUsersFromCloud();
+    if (!users || users.length === 0) {
+        users = getRegisteredUsers();
+    }
+
     let matchedUser = users.find(u => {
         const uEmail = (u.email || "").toLowerCase();
         const uMob = (u.mobile || "").replace(/[^0-9]/g, "");
@@ -938,7 +1087,7 @@ async function handleSendOtpSubmit(e) {
         };
     }
 
-    // If still not matched, check if valid email or 10-digit mobile
+    // Fallback for valid email or mobile
     if (!matchedUser) {
         if (isEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inputVal)) {
             matchedUser = {
@@ -971,7 +1120,7 @@ async function handleSendOtpSubmit(e) {
     const targetEmail = matchedUser.email || (isEmail ? inputVal : OWNER_EMAIL);
     const targetDisplay = isEmail ? inputVal : (cleanMob ? `+91 ${cleanMob}` : inputVal);
 
-    currentOtpState = {
+    saveCurrentOtpState({
         code: otpCode,
         expiresAt: Date.now() + 10 * 60 * 1000,
         targetDisplay: targetDisplay,
@@ -979,7 +1128,7 @@ async function handleSendOtpSubmit(e) {
         user: matchedUser,
         cooldown: 59,
         timerId: null
-    };
+    });
 
     const targetDispEl = document.getElementById("otpTargetDisplay");
     if (targetDispEl) targetDispEl.textContent = targetDisplay;
@@ -987,12 +1136,12 @@ async function handleSendOtpSubmit(e) {
     const badgeEl = document.getElementById("otpStatusBadge");
     if (badgeEl) badgeEl.textContent = isOwner ? "Owner OTP Verification" : "Secure OTP Verification";
 
-    // Dispatch to Email
+    // Dispatch via Email
     if (targetEmail) {
         dispatchOtpToRequesterEmail(targetEmail, matchedUser.name || "Ajanta Staff", otpCode, "AJANTA-AUTH");
     }
 
-    // Also show Quick Push Notification for seamless access
+    // Show Push Notification Banner with Auto-Fill
     triggerSystemPushBanner({
         title: "Your 6-Digit Login OTP",
         body: `Access OTP for <strong>${matchedUser.name}</strong> is <span class="font-mono text-xl font-black text-amber-300 tracking-widest px-2 py-0.5 bg-amber-950/80 rounded-lg border border-amber-500/40">${otpCode}</span>`,
@@ -1069,11 +1218,12 @@ function startOtpCountdown() {
 }
 
 function autoFillCurrentOtp() {
-    if (!currentOtpState.code || currentOtpState.code.length !== 6) {
+    const state = loadCurrentOtpState();
+    if (!state.code || state.code.length !== 6) {
         showToast("No active OTP. Please request a code first.", "fa-triangle-exclamation");
         return;
     }
-    const digits = currentOtpState.code.split("");
+    const digits = state.code.split("");
     for (let i = 1; i <= 6; i++) {
         const input = document.getElementById(`otpDigit${i}`);
         if (input && digits[i - 1]) input.value = digits[i - 1];
@@ -1081,22 +1231,20 @@ function autoFillCurrentOtp() {
     showToast("OTP Auto-Filled successfully!", "fa-wand-magic-sparkles");
     setTimeout(() => {
         handleVerifyOtpSubmit();
-    }, 300);
+    }, 200);
 }
 
 async function resendOtpToEmail() {
-    const email = currentOtpState.email || (currentApprovalState.details && currentApprovalState.details.email);
-    if (!email) {
-        showToast("No email address found for resend.", "fa-triangle-exclamation");
-        return;
-    }
+    const state = loadCurrentOtpState();
+    const email = state.email || (currentApprovalState.details && currentApprovalState.details.email) || OWNER_EMAIL;
 
     const newOtp = generateSecureRandomOtp();
-    currentOtpState.code = newOtp;
-    currentOtpState.expiresAt = Date.now() + 10 * 60 * 1000;
+    state.code = newOtp;
+    state.expiresAt = Date.now() + 10 * 60 * 1000;
+    saveCurrentOtpState(state);
 
-    const ticketId = currentApprovalState.ticketId || (currentOtpState.user && currentOtpState.user.ticketId) || "AJANTA-APPR";
-    const name = currentOtpState.user?.name || "Admin Staff";
+    const ticketId = currentApprovalState.ticketId || (state.user && state.user.ticketId) || "AJANTA-APPR";
+    const name = state.user?.name || "Admin Staff";
 
     // Cloud update
     try {
@@ -1112,9 +1260,26 @@ async function resendOtpToEmail() {
         }).catch(() => {});
     } catch (e) {}
 
+    triggerSystemPushBanner({
+        title: "Resent 6-Digit Login OTP",
+        body: `New OTP for <strong>${name}</strong> is <span class="font-mono text-xl font-black text-amber-300 tracking-widest px-2 py-0.5 bg-amber-950/80 rounded-lg border border-amber-500/40">${newOtp}</span>`,
+        icon: "fa-shield-halved",
+        actions: [
+            {
+                html: `<i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Auto-Fill Code`,
+                className: "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow",
+                onClick: () => {
+                    dismissPushBanner();
+                    autoFillCurrentOtp();
+                }
+            }
+        ],
+        sound: true
+    });
+
     dispatchOtpToRequesterEmail(email, name, newOtp, ticketId);
     startOtpCountdown();
-    showToast(`New OTP dispatched to ${email}`, "fa-paper-plane");
+    showToast(`New OTP dispatched to ${state.targetDisplay || email}`, "fa-paper-plane");
 }
 
 function handleVerifyOtpSubmit(e) {
@@ -1128,38 +1293,49 @@ function handleVerifyOtpSubmit(e) {
         }
     }
 
+    const state = loadCurrentOtpState();
+
     let enteredCode = "";
     for (let i = 1; i <= 6; i++) {
         const digit = document.getElementById(`otpDigit${i}`)?.value?.trim() || "";
         if (digit) enteredCode += digit;
     }
 
-    const isMasterPin = enteredCode === "2601" || enteredCode === "0650" || enteredCode === "260126" || enteredCode === "9070" || enteredCode.startsWith("2601") || enteredCode.startsWith("0650");
+    const targetUser = state.user || {};
+    const isOwnerTarget = (
+        targetUser.username === "pratham_mehta" ||
+        targetUser.id === "usr-owner-pratham" ||
+        (targetUser.email && targetUser.email.toLowerCase() === OWNER_EMAIL) ||
+        targetUser.mobile === "9812500455"
+    );
+
+    // Master PIN bypass is STRICTLY ONLY allowed when verifying OTP for Primary Owner (Pratham Mehta)
+    const isMasterPin = isOwnerTarget && (enteredCode === "2601" || enteredCode === "0650" || enteredCode === "260126" || enteredCode === "9070" || enteredCode.startsWith("2601") || enteredCode.startsWith("0650"));
 
     if (!isMasterPin && enteredCode.length !== 6) {
         showErr("Please enter the complete 6-digit OTP received on your email.");
         return;
     }
 
-    if (!isMasterPin && currentOtpState.expiresAt && Date.now() > currentOtpState.expiresAt) {
-        showErr("This OTP has expired. Please click 'Resend Code to Email'.");
+    if (!isMasterPin && state.expiresAt && Date.now() > state.expiresAt) {
+        showErr("This OTP has expired. Please click 'Resend Code'.");
         return;
     }
 
-    if (!isMasterPin && enteredCode !== currentOtpState.code) {
-        showErr("Invalid OTP code. Please check your email inbox/spam and try again.");
+    if (!isMasterPin && (!state.code || enteredCode !== state.code)) {
+        showErr("Invalid OTP code. Please check your email / notification banner and try again.");
         return;
     }
 
     // Success: Authenticate user
-    let userToAuth = currentOtpState.user || {
+    let userToAuth = targetUser.username ? targetUser : {
         name: "Approved Admin Staff",
         username: "admin_staff",
         role: "Staff Member"
     };
 
-    if (currentOtpState.pendingNewUser) {
-        const newUser = currentOtpState.pendingNewUser;
+    if (state.pendingNewUser) {
+        const newUser = state.pendingNewUser;
         newUser.role = "Staff Member"; // STRICT STAFF ONLY
         newUser.isMasterUnlocked = false;
 
@@ -1174,12 +1350,13 @@ function handleVerifyOtpSubmit(e) {
         userToAuth = newUser;
         showToast(`Account registered & verified! Welcome, ${newUser.name}!`, "fa-user-check");
     } else {
-        // If user was registered with pending approval, activate their account
+        // Activate account status
         try {
             const users = getRegisteredUsers();
             const matchIdx = users.findIndex(u =>
                 (u.email && u.email.toLowerCase() === (userToAuth.email || "").toLowerCase()) ||
-                (u.username && u.username.toLowerCase() === (userToAuth.username || "").toLowerCase())
+                (u.username && u.username.toLowerCase() === (userToAuth.username || "").toLowerCase()) ||
+                (u.mobile && userToAuth.mobile && u.mobile.replace(/[^0-9]/g, "") === userToAuth.mobile.replace(/[^0-9]/g, ""))
             );
             if (matchIdx !== -1) {
                 users[matchIdx].status = "ACTIVE";
@@ -1192,6 +1369,7 @@ function handleVerifyOtpSubmit(e) {
         }
     }
 
+    clearCurrentOtpState();
     setLoginSession(userToAuth);
 
     if (errBox) errBox.classList.add("hidden");
@@ -1212,11 +1390,13 @@ function getActiveUser() {
 
 function setLoginSession(user) {
     const now = Date.now();
+    sessionStorage.removeItem("SESSION_PIN_UNLOCKED");
     sessionStorage.setItem(STORAGE_KEYS.SESSION, "true");
     localStorage.setItem(STORAGE_KEYS.SESSION, "true");
     localStorage.setItem(STORAGE_KEYS.SESSION_TIME, String(now));
     sessionStorage.setItem(STORAGE_KEYS.SESSION_TIME, String(now));
     if (user) {
+        user.isMasterUnlocked = false; // Require PIN entry after login
         sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(user));
         localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(user));
     }
@@ -1360,21 +1540,24 @@ async function handleRegisterSubmit(e) {
         regBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Generating 6-Digit Verification OTP...`;
     }
 
-    // Strictly new staff user template - CANNOT BE MASTER HQ
+    // User role template
     const designation = document.getElementById("regDesignation")?.value || "Staff Member";
     let defaultModule = "products";
     if (designation === "Sales Executive") defaultModule = "leads";
 
+    const isSunnyMaster = (username || "").toLowerCase() === "sunny" || (name || "").toLowerCase().includes("sunny mehta") || cleanMobile === "9215400355";
+
     const newUser = {
-        id: `usr-${Date.now()}`,
+        id: isSunnyMaster ? "usr-sunny-master" : `usr-${Date.now()}`,
         name: name,
         email: email,
         mobile: cleanMobile,
         username: username,
         password: password,
-        designation: designation,
-        role: designation === "Manager" ? "Manager" : "Staff Member", // STRICT NON-OWNER
-        allowedTab: defaultModule,
+        designation: isSunnyMaster ? "Master HQ" : designation,
+        role: isSunnyMaster ? "Master HQ" : (designation === "Manager" ? "Manager" : "Staff Member"),
+        allowedTab: isSunnyMaster ? "ALL" : defaultModule,
+        isMasterUnlocked: isSunnyMaster,
         status: "ACTIVE",
         createdAt: new Date().toISOString()
     };
@@ -1479,33 +1662,71 @@ async function handleLoginSubmit(e) {
         return;
     }
 
-    // Owner Master PIN Bypass check
-    if (passIn === "2601" || passIn === "0650" || ((identifier === "admin" || identifier === "9812500455" || identifier === "pratham_mehta") && (passIn === "admin" || passIn === "admin123" || passIn === "2601" || passIn === "0650"))) {
+    // Owner Master PIN Bypass check - ONLY for Primary Owner credentials
+    const cleanId = identifier.replace(/[^0-9]/g, "");
+    const isOwnerIdentifier = (
+        identifier.toLowerCase() === "pratham_mehta" ||
+        identifier.toLowerCase() === "admin" ||
+        identifier.toLowerCase() === OWNER_EMAIL ||
+        cleanId === "9812500455"
+    );
+
+    if (isOwnerIdentifier && (passIn === "2601" || passIn === "0650" || passIn === "admin" || passIn === "admin123")) {
         loginDirectAsOwner();
         return;
     }
 
-    let users = getRegisteredUsers();
-    const cleanId = identifier.replace(/[^0-9]/g, "");
+    // Direct Login Authentication for Sunny Mehta (Master HQ)
+    const isSunnyIdentifier = (
+        identifier.toLowerCase() === "sunny" ||
+        cleanId === "9215400355" ||
+        (identifier.toLowerCase() === "mehtapratham907@gmail.com" && passIn === "0650")
+    );
 
-    // 1. Check local users
+    if (isSunnyIdentifier && (passIn === "0650" || passIn === "admin" || passIn === "2601")) {
+        const sunnyUser = {
+            id: "usr-sunny-master",
+            name: "Sunny Mehta",
+            username: "Sunny",
+            email: "mehtapratham907@gmail.com",
+            mobile: "9215400355",
+            password: "0650",
+            role: "Master HQ",
+            designation: "Master HQ",
+            allowedTab: "ALL",
+            isMasterUnlocked: true,
+            status: "ACTIVE"
+        };
+        let allUsers = getRegisteredUsers();
+        const sIdx = allUsers.findIndex(u => (u.username || "").toLowerCase() === "sunny" || (u.mobile || "").replace(/[^0-9]/g, "") === "9215400355");
+        if (sIdx !== -1) {
+            allUsers[sIdx] = sunnyUser;
+        } else {
+            allUsers.push(sunnyUser);
+        }
+        saveRegisteredUsers(allUsers);
+
+        setLoginSession(sunnyUser);
+        if (errBox) errBox.classList.add("hidden");
+        dismissPushBanner();
+        showToast("Welcome Back, Sunny Mehta! (Master HQ)", "fa-crown");
+        checkAuthSession();
+        return;
+    }
+
+    // Always pull latest users from cloud first so new registrations across devices work immediately
+    let users = await pullUsersFromCloud();
+    if (!users || users.length === 0) {
+        users = getRegisteredUsers();
+    }
+
+    // Match registered user
     let matchedUser = users.find(u => {
         const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
         const matchEmail = (u.email || "").toLowerCase() === identifier.toLowerCase();
         const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
         return (matchUser || matchEmail || matchMob) && u.password === passIn;
     });
-
-    // 2. If not found locally, try pulling latest users from server/cloud database
-    if (!matchedUser) {
-        users = await pullUsersFromCloud();
-        matchedUser = users.find(u => {
-            const matchUser = (u.username || "").toLowerCase() === identifier.toLowerCase();
-            const matchEmail = (u.email || "").toLowerCase() === identifier.toLowerCase();
-            const matchMob = cleanId.length === 10 && (u.mobile || "").replace(/[^0-9]/g, "") === cleanId;
-            return (matchUser || matchEmail || matchMob) && u.password === passIn;
-        });
-    }
 
     if (matchedUser) {
         if (matchedUser.status === "BLOCKED" || matchedUser.status === "PERMANENTLY_DISABLED") {
@@ -1580,6 +1801,7 @@ function toggleLoginPassword() {
 }
 
 function handleLogout() {
+    sessionStorage.removeItem("SESSION_PIN_UNLOCKED");
     sessionStorage.removeItem(STORAGE_KEYS.SESSION);
     sessionStorage.removeItem(STORAGE_KEYS.SESSION_TIME);
     sessionStorage.removeItem(STORAGE_KEYS.ACTIVE_USER);
@@ -1593,22 +1815,43 @@ function handleLogout() {
 function saveNewCredentials(e) {
     if (e) e.preventDefault();
     const activeUser = getActiveUser();
+    const newName = document.getElementById("settingName")?.value?.trim();
+    const newEmail = document.getElementById("settingEmail")?.value?.trim();
+    const newMobile = document.getElementById("settingMobile")?.value?.trim();
     const newPass = document.getElementById("settingPassword")?.value?.trim();
 
-    if (!newPass) {
-        showToast("Please enter a new password", "fa-triangle-exclamation");
+    if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+        showToast("Please enter a valid email address.", "fa-triangle-exclamation");
         return;
     }
 
     const users = getRegisteredUsers();
-    const idx = users.findIndex(u => u.username === activeUser.username || u.mobile === activeUser.mobile);
+    const idx = users.findIndex(u =>
+        (u.username && u.username.toLowerCase() === (activeUser.username || "").toLowerCase()) ||
+        (u.mobile && u.mobile.replace(/[^0-9]/g, "") === (activeUser.mobile || "").replace(/[^0-9]/g, "")) ||
+        (u.id && u.id === activeUser.id)
+    );
+
     if (idx !== -1) {
-        users[idx].password = newPass;
+        if (newName) users[idx].name = newName;
+        if (newEmail) users[idx].email = newEmail;
+        if (newMobile) users[idx].mobile = newMobile.replace(/[^0-9]/g, "");
+        if (newPass) users[idx].password = newPass;
+
         saveRegisteredUsers(users);
-        activeUser.password = newPass;
-        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
-        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
-        showToast("Password updated successfully", "fa-key");
+
+        if (newName) activeUser.name = newName;
+        if (newEmail) activeUser.email = newEmail;
+        if (newMobile) activeUser.mobile = newMobile.replace(/[^0-9]/g, "");
+        if (newPass) activeUser.password = newPass;
+
+        setLoginSession(activeUser);
+
+        // Refresh UI
+        initDashboard();
+        showToast("Email & Account details saved successfully!", "fa-circle-check");
+    } else {
+        showToast("Account profile updated", "fa-circle-check");
     }
 }
 
@@ -1626,12 +1869,14 @@ function initDashboard() {
     // Personal User Profile Elements (Spotify-like individual account display)
     const profName = document.getElementById("profileFullName");
     const profMobile = document.getElementById("profileMobile");
+    const profEmail = document.getElementById("profileEmail");
     const profUser = document.getElementById("profileUsername");
     const profId = document.getElementById("profileUserId");
     const profAvatar = document.getElementById("profileAvatarInitials");
 
     if (profName) profName.textContent = activeUser.name || "Administrator";
     if (profMobile) profMobile.textContent = activeUser.mobile || "—";
+    if (profEmail) profEmail.textContent = activeUser.email || "mehtapratham907@gmail.com";
     if (profUser) profUser.textContent = activeUser.username || "admin";
     if (profId) profId.textContent = activeUser.id || ("usr-" + (activeUser.username || "active"));
     if (profAvatar) {
@@ -1646,10 +1891,18 @@ function initDashboard() {
 
     // Settings inputs
     const setUsername = document.getElementById("settingUsername");
+    const setName = document.getElementById("settingName");
+    const setEmail = document.getElementById("settingEmail");
+    const setMobile = document.getElementById("settingMobile");
     const setPass = document.getElementById("settingPassword");
+
     if (setUsername) setUsername.value = activeUser.username || "";
+    if (setName) setName.value = activeUser.name || "";
+    if (setEmail) setEmail.value = activeUser.email || "mehtapratham907@gmail.com";
+    if (setMobile) setMobile.value = activeUser.mobile || "";
     if (setPass) setPass.value = "";
 
+    updateMasterPinHeaderUI();
     updateBadgesAndStats();
     renderProductsGrid();
     renderLeadsTable();
@@ -1658,6 +1911,24 @@ function initDashboard() {
     renderBandsTable();
     pullProductsFromCloud();
     pullBroadcastsFromCloud();
+    pullUsersFromCloud().then(cloudUsers => {
+        if (cloudUsers && Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+            renderBandsTable(cloudUsers);
+            updateBadgesAndStats();
+        }
+    }).catch(() => {});
+
+    // Real-time Cloud Sync Timer (Poll every 10 seconds for new staff registrations across devices)
+    if (!window.cloudStaffPollTimer) {
+        window.cloudStaffPollTimer = setInterval(() => {
+            pullUsersFromCloud().then(cloudUsers => {
+                if (cloudUsers && Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+                    renderBandsTable(cloudUsers);
+                    updateBadgesAndStats();
+                }
+            }).catch(() => {});
+        }, 10000);
+    }
 }
 
 function switchTab(tabId) {
@@ -2285,6 +2556,7 @@ function clearSelectedImage() {
 }
 
 function openProductModal(productId = null) {
+    if (!ensureMasterPinUnlocked()) return;
     const modal = document.getElementById("productModal");
     const titleEl = document.getElementById("productModalTitle");
     const form = document.getElementById("productEditForm");
@@ -2375,6 +2647,7 @@ function updateLivePreview() {
 
 function saveProductForm(e) {
     if (e) e.preventDefault();
+    if (!ensureMasterPinUnlocked()) return;
     const id = document.getElementById("prodFormId")?.value;
     const title = document.getElementById("prodFormTitle")?.value?.trim();
     const subtitle = document.getElementById("prodFormSubtitle")?.value?.trim() || "";
@@ -2419,6 +2692,7 @@ function saveProductForm(e) {
 }
 
 async function deleteProduct(id) {
+    if (!ensureMasterPinUnlocked()) return;
     let products = getStoredProducts();
     const prod = products.find(p => p.id === id);
     if (!prod) return;
@@ -3205,7 +3479,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let activeBandFilter = "ALL";
 
+function isAuthorizedMasterUser() {
+    const activeUser = getActiveUser();
+    const uName = (activeUser.username || "").toLowerCase();
+    const mob = (activeUser.mobile || "").replace(/[^0-9]/g, "");
+    return uName === "pratham_mehta" ||
+        uName === "sunny" ||
+        mob === "9812500455" ||
+        mob === "9215400355" ||
+        activeUser.id === "usr-owner-pratham" ||
+        activeUser.id === "usr-sunny-master" ||
+        activeUser.role === "Master HQ" ||
+        activeUser.role === "Managing Director (Owner HQ)";
+}
+
 function openMasterPinModal() {
+    if (!isAuthorizedMasterUser()) {
+        showToast("⛔ Access Denied! Master controls reserved for Pratham Mehta & Sunny Mehta only.", "fa-shield-halved");
+        return;
+    }
     const modal = document.getElementById("masterPinUnlockModal");
     const err = document.getElementById("masterPinModalError");
     const input = document.getElementById("modalMasterPinInput");
@@ -3220,34 +3512,57 @@ function closeMasterPinModal() {
     if (modal) modal.classList.add("hidden");
 }
 
+function isMasterPinUnlocked() {
+    return sessionStorage.getItem("SESSION_PIN_UNLOCKED") === "true";
+}
+
+function updateMasterPinHeaderUI() {
+    const btn = document.getElementById("unlockMasterPinHeaderBtn");
+    if (!btn) return;
+
+    if (!isAuthorizedMasterUser()) {
+        btn.classList.add("hidden");
+        return;
+    }
+
+    btn.classList.remove("hidden");
+    if (isMasterPinUnlocked()) {
+        btn.className = "bg-gradient-to-r from-emerald-950 to-teal-950 text-emerald-300 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-sm";
+        btn.innerHTML = `<i class="fa-solid fa-lock-open text-emerald-400"></i> <span id="headerMasterPinBadgeText">Master Controls Unlocked</span>`;
+    } else {
+        btn.className = "bg-amber-950/90 hover:bg-amber-900 text-amber-300 border border-amber-500/60 px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md animate-pulse";
+        btn.innerHTML = `<i class="fa-solid fa-key text-amber-400"></i> <span id="headerMasterPinBadgeText">🔑 Unlock Master Controls (PIN Required)</span>`;
+    }
+}
+
 function verifyMasterPinUnlock() {
+    if (!isAuthorizedMasterUser()) {
+        showToast("⛔ Unauthorized user attempt.", "fa-ban");
+        return;
+    }
     const pin = document.getElementById("modalMasterPinInput")?.value?.trim();
     const errBox = document.getElementById("masterPinModalError");
 
     if (pin === "2601" || pin === "0650" || pin === "9070") {
+        sessionStorage.setItem("SESSION_PIN_UNLOCKED", "true");
         const activeUser = getActiveUser();
-        activeUser.role = "Managing Director (Owner HQ)";
         activeUser.isMasterUnlocked = true;
-        
+
         sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
         localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
 
-        const badgeText = document.getElementById("headerMasterPinBadgeText");
-        const btn = document.getElementById("unlockMasterPinHeaderBtn");
-        if (badgeText) badgeText.textContent = "Master Access Unlocked";
-        if (btn) {
-            btn.className = "bg-gradient-to-r from-amber-600 to-yellow-500 text-white border border-yellow-400/80 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-950/60";
-        }
-
         closeMasterPinModal();
-        showToast("Master Access Unlocked! Full Owner Rights Granted.", "fa-crown");
+        updateMasterPinHeaderUI();
+        showToast("🔓 Master Security PIN Verified! Controls & Admin features unlocked.", "fa-crown");
+
         renderBandsTable();
-        
+        renderProductsGrid();
+
         // Remove restricted overlays
         document.querySelectorAll("[id^='restrictedTabOverlay-']").forEach(el => el.remove());
     } else {
         if (errBox) {
-            errBox.textContent = "Invalid Owner Security PIN (2601 / 0650). Access denied.";
+            errBox.textContent = "Invalid Security PIN (2601 / 0650). Access denied.";
             errBox.classList.remove("hidden");
         }
     }
@@ -3261,14 +3576,12 @@ function isPrimaryOwnerSession() {
 }
 
 function ensureMasterPinUnlocked() {
-    const activeUser = getActiveUser();
-    const isOwnerSession = activeUser.isMasterUnlocked ||
-        activeUser.role === "Managing Director (Owner HQ)" ||
-        activeUser.role === "Master HQ" ||
-        isPrimaryOwnerSession();
-
-    if (!isOwnerSession) {
-        showToast("🔑 Owner Security PIN (2601 / 0650) required for this action.", "fa-lock");
+    if (!isAuthorizedMasterUser()) {
+        showToast("⛔ Access Denied! Master controls reserved exclusively for Pratham Mehta & Sunny Mehta.", "fa-shield-halved");
+        return false;
+    }
+    if (!isMasterPinUnlocked()) {
+        showToast("🔑 Security PIN (2601 / 0650) required to unlock Master controls.", "fa-lock");
         openMasterPinModal();
         return false;
     }
@@ -3276,11 +3589,13 @@ function ensureMasterPinUnlocked() {
 }
 
 function ensureMasterOwnerAuthority() {
-    if (!isPrimaryOwnerSession()) {
-        showToast("⛔ Access Denied! Only Primary Owner Pratham Mehta can modify user roles or delete accounts.", "fa-shield-halved");
+    if (!ensureMasterPinUnlocked()) return false;
+
+    if (!isAuthorizedMasterUser()) {
+        showToast("⛔ Access Denied! Master HQ or Primary Owner role required.", "fa-shield-halved");
         return false;
     }
-    return ensureMasterPinUnlocked();
+    return true;
 }
 
 function setBandFilter(filter) {
@@ -3298,12 +3613,23 @@ function setBandFilter(filter) {
     renderBandsTable();
 }
 
-function renderBandsTable() {
+async function refreshBandsTableWithCloud() {
+    try {
+        showToast("Syncing staff & band credentials from cloud...", "fa-arrows-rotate");
+        const cloudUsers = await pullUsersFromCloud();
+        renderBandsTable(cloudUsers);
+        showToast("Staff & Band list synced with Cloud Database!", "fa-circle-check");
+    } catch (e) {
+        renderBandsTable();
+    }
+}
+
+function renderBandsTable(explicitUsers = null) {
     const tableBody = document.getElementById("bandsTableBody");
     if (!tableBody) return;
 
     const query = (document.getElementById("bandSearchInput")?.value || "").toLowerCase().trim();
-    let users = getRegisteredUsers();
+    let users = explicitUsers || getRegisteredUsers();
 
     // Default system owner entry if not present
     const hasOwner = users.some(u => u.username === "pratham_mehta" || u.id === "usr-owner-pratham");
@@ -3420,6 +3746,10 @@ function renderBandsTable() {
                         </span>
                     ` : viewerIsPrimaryOwner ? `
                         <div class="flex items-center justify-end gap-1.5">
+                            <button onclick="openEditStaffModal('${u.id || u.username}')" class="bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 text-[11px] font-bold px-2 py-1.5 rounded-lg border border-cyan-800/40 transition cursor-pointer flex items-center gap-1" title="Edit Email & Details">
+                                <i class="fa-solid fa-user-pen text-[10px]"></i>
+                                <span>Edit Email</span>
+                            </button>
                             <button onclick="revokeStaffSession('${u.id || u.username}')" class="bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-semibold px-2 py-1.5 rounded-lg border border-slate-700 transition cursor-pointer flex items-center gap-1" title="Log out session">
                                 <i class="fa-solid fa-right-from-bracket text-[10px]"></i>
                                 <span>Revoke</span>
@@ -3447,6 +3777,17 @@ function renderBandsTable() {
             </tr>
         `;
     }).join("");
+
+    // Silent background cloud pull if explicitUsers was not provided
+    if (!explicitUsers) {
+        pullUsersFromCloud().then(cloudUsers => {
+            if (cloudUsers && Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+                if (cloudUsers.length !== users.length) {
+                    renderBandsTable(cloudUsers);
+                }
+            }
+        }).catch(() => {});
+    }
 }
 
 function revokeStaffSession(userId) {
@@ -3525,6 +3866,84 @@ function changeUserModule(userId, newModule) {
     }
 }
 
+function openEditStaffModal(userId) {
+    if (!ensureMasterOwnerAuthority()) return;
+    const users = getRegisteredUsers();
+    const target = users.find(u => u.id === userId || u.username === userId || u.email === userId);
+    if (!target) {
+        showToast("Staff user not found.", "fa-triangle-exclamation");
+        return;
+    }
+
+    const idEl = document.getElementById("editStaffId");
+    const nameEl = document.getElementById("editStaffName");
+    const emailEl = document.getElementById("editStaffEmail");
+    const mobEl = document.getElementById("editStaffMobile");
+    const userEl = document.getElementById("editStaffUsername");
+    const roleEl = document.getElementById("editStaffRole");
+    const tabEl = document.getElementById("editStaffAllowedTab");
+    const passEl = document.getElementById("editStaffPassword");
+
+    if (idEl) idEl.value = target.id || target.username;
+    if (nameEl) nameEl.value = target.name || "";
+    if (emailEl) emailEl.value = target.email || "";
+    if (mobEl) mobEl.value = target.mobile || "";
+    if (userEl) userEl.value = target.username || "";
+    if (roleEl) roleEl.value = target.role || "Staff Member";
+    if (tabEl) tabEl.value = target.allowedTab || "products";
+    if (passEl) passEl.value = "";
+
+    const modal = document.getElementById("editStaffModal");
+    if (modal) modal.classList.remove("hidden");
+}
+
+function closeEditStaffModal() {
+    const modal = document.getElementById("editStaffModal");
+    if (modal) modal.classList.add("hidden");
+}
+
+function saveEditStaffForm(e) {
+    if (e) e.preventDefault();
+    if (!ensureMasterOwnerAuthority()) return;
+
+    const id = document.getElementById("editStaffId")?.value;
+    const name = document.getElementById("editStaffName")?.value?.trim();
+    const email = document.getElementById("editStaffEmail")?.value?.trim();
+    const mobileRaw = document.getElementById("editStaffMobile")?.value?.trim();
+    const username = document.getElementById("editStaffUsername")?.value?.trim();
+    const role = document.getElementById("editStaffRole")?.value;
+    const allowedTab = document.getElementById("editStaffAllowedTab")?.value;
+    const pass = document.getElementById("editStaffPassword")?.value?.trim();
+
+    if (!name || !email || !username) {
+        showToast("Please fill in Name, Email, and Username.", "fa-triangle-exclamation");
+        return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast("Please enter a valid email address.", "fa-triangle-exclamation");
+        return;
+    }
+
+    let users = getRegisteredUsers();
+    const idx = users.findIndex(u => u.id === id || u.username === id || u.email === id);
+    if (idx !== -1) {
+        users[idx].name = name;
+        users[idx].email = email;
+        users[idx].mobile = mobileRaw ? mobileRaw.replace(/[^0-9]/g, "") : users[idx].mobile;
+        users[idx].username = username;
+        users[idx].role = role;
+        users[idx].allowedTab = role === "Master HQ" ? "ALL" : allowedTab;
+        if (role === "Master HQ") users[idx].isMasterUnlocked = true;
+        if (pass) users[idx].password = pass;
+
+        saveRegisteredUsers(users);
+        closeEditStaffModal();
+        showToast(`Updated details & email for ${name}!`, "fa-circle-check");
+        renderBandsTable();
+    }
+}
+
 // Explicit Global Window Exports for Inline HTML Onclick Handlers
 window.switchAuthMode = switchAuthMode;
 window.switchTab = switchTab;
@@ -3548,6 +3967,9 @@ window.reenableStaffAccount = reenableStaffAccount;
 window.deleteStaffAccount = deleteStaffAccount;
 window.changeUserRole = changeUserRole;
 window.changeUserModule = changeUserModule;
+window.openEditStaffModal = openEditStaffModal;
+window.closeEditStaffModal = closeEditStaffModal;
+window.saveEditStaffForm = saveEditStaffForm;
 window.toggleLoginPassword = toggleLoginPassword;
 window.handleLogout = handleLogout;
 window.openProductModal = openProductModal;
