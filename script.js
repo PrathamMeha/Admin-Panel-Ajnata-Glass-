@@ -314,17 +314,16 @@ function getRegisteredUsers() {
         users = [...DEFAULT_USERS];
     }
 
-    // Ensure Sunny Mehta has Master HQ role (NOT Primary Owner)
+    // Ensure Sunny Mehta defaults exist if not present, without hardcoding role overwrites
     let sunnyIdx = users.findIndex(u =>
         (u.username || "").toLowerCase() === "sunny" ||
         (u.mobile || "").replace(/[^0-9]/g, "") === "9215400355"
     );
     if (sunnyIdx !== -1) {
-        users[sunnyIdx].role = "Master HQ";
-        users[sunnyIdx].designation = "Master HQ";
-        users[sunnyIdx].allowedTab = "ALL";
-        users[sunnyIdx].isMasterUnlocked = true;
-        users[sunnyIdx].password = "0650";
+        if (!users[sunnyIdx].role) users[sunnyIdx].role = "Master HQ";
+        if (!users[sunnyIdx].designation) users[sunnyIdx].designation = users[sunnyIdx].role;
+        if (!users[sunnyIdx].allowedTab) users[sunnyIdx].allowedTab = "ALL";
+        if (!users[sunnyIdx].password) users[sunnyIdx].password = "0650";
         if (!users[sunnyIdx].email) users[sunnyIdx].email = "mehtapratham907@gmail.com";
         if (!users[sunnyIdx].name) users[sunnyIdx].name = "Sunny Mehta";
     } else {
@@ -360,30 +359,11 @@ function saveRegisteredUsers(users) {
 async function syncUsersToCloud(users) {
     try {
         const endpoint = `${CLOUD_SYNC_CONFIG.BASE_URL}${CLOUD_SYNC_CONFIG.USERS_KEY}`;
-        let remoteUsers = [];
-        try {
-            const res = await fetch(endpoint).catch(() => null);
-            if (res && res.ok) {
-                remoteUsers = await res.json().catch(() => []);
-            }
-        } catch (e) {}
-        if (!Array.isArray(remoteUsers)) remoteUsers = [];
-
-        const mergedMap = new Map();
-        remoteUsers.forEach(u => {
-            const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
-            if (key) mergedMap.set(key, u);
-        });
-        users.forEach(u => {
-            const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
-            if (key) mergedMap.set(key, u);
-        });
-        const finalUsers = Array.from(mergedMap.values());
-
+        // POST updated users array directly to cloud database (KVDB)
         await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(finalUsers)
+            body: JSON.stringify(users)
         });
     } catch (e) {
         console.warn("Background user cloud sync:", e);
@@ -399,28 +379,28 @@ async function pullUsersFromCloud() {
             if (Array.isArray(remoteUsers) && remoteUsers.length > 0) {
                 const localUsers = getRegisteredUsers();
                 const mergedMap = new Map();
-                localUsers.forEach(u => {
-                    const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
-                    if (key) mergedMap.set(key, u);
-                });
+                // Put remote users into map FIRST
                 remoteUsers.forEach(u => {
                     const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
                     if (key) mergedMap.set(key, u);
                 });
+                // Put local users into map SECOND so recent local edits override remote stale cache
+                localUsers.forEach(u => {
+                    const key = (u.username || u.mobile || u.id || u.email || "").toLowerCase();
+                    if (key) mergedMap.set(key, u);
+                });
                 const merged = Array.from(mergedMap.values());
-                // Guarantee Sunny Master HQ credentials in merged set
                 const sunnyInMerged = merged.find(u => (u.username || "").toLowerCase() === "sunny" || (u.mobile || "").replace(/[^0-9]/g, "") === "9215400355");
                 if (sunnyInMerged) {
-                    sunnyInMerged.name = "Sunny Mehta";
+                    sunnyInMerged.name = sunnyInMerged.name || "Sunny Mehta";
                     sunnyInMerged.username = "Sunny";
-                    sunnyInMerged.password = "0650";
-                    sunnyInMerged.role = "Master HQ";
-                    sunnyInMerged.designation = "Master HQ";
-                    sunnyInMerged.allowedTab = "ALL";
-                    sunnyInMerged.isMasterUnlocked = true;
-                    sunnyInMerged.email = "mehtapratham907@gmail.com";
-                    sunnyInMerged.mobile = "9215400355";
-                    sunnyInMerged.status = "ACTIVE";
+                    sunnyInMerged.password = sunnyInMerged.password || "0650";
+                    if (!sunnyInMerged.role) sunnyInMerged.role = "Master HQ";
+                    if (!sunnyInMerged.designation) sunnyInMerged.designation = sunnyInMerged.role;
+                    if (!sunnyInMerged.allowedTab) sunnyInMerged.allowedTab = "ALL";
+                    sunnyInMerged.email = sunnyInMerged.email || "mehtapratham907@gmail.com";
+                    sunnyInMerged.mobile = sunnyInMerged.mobile || "9215400355";
+                    sunnyInMerged.status = sunnyInMerged.status || "ACTIVE";
                 } else {
                     merged.push({
                         id: "usr-sunny-master",
@@ -1402,7 +1382,37 @@ function setLoginSession(user) {
     }
 }
 
+function initAdminTheme() {
+    const savedTheme = localStorage.getItem("ADMIN_PORTAL_THEME") || "dark";
+    applyAdminTheme(savedTheme);
+}
+
+function toggleAdminTheme() {
+    const isLight = document.documentElement.classList.contains("light-mode");
+    const newTheme = isLight ? "dark" : "light";
+    localStorage.setItem("ADMIN_PORTAL_THEME", newTheme);
+    applyAdminTheme(newTheme);
+    showToast(`Switched to ${newTheme === "light" ? "Light Mode" : "Dark Mode"}`, "fa-circle-half-stroke");
+}
+
+function applyAdminTheme(theme) {
+    const icon = document.getElementById("themeToggleIcon");
+    const text = document.getElementById("themeToggleText");
+    if (theme === "light") {
+        document.documentElement.classList.add("light-mode");
+        document.documentElement.classList.remove("dark");
+        if (icon) icon.className = "fa-solid fa-moon text-indigo-400";
+        if (text) text.textContent = "Dark Mode";
+    } else {
+        document.documentElement.classList.remove("light-mode");
+        document.documentElement.classList.add("dark");
+        if (icon) icon.className = "fa-solid fa-sun text-amber-400";
+        if (text) text.textContent = "Light Mode";
+    }
+}
+
 function checkAuthSession() {
+    initAdminTheme();
     const sessionVal = sessionStorage.getItem(STORAGE_KEYS.SESSION);
     const localVal = localStorage.getItem(STORAGE_KEYS.SESSION);
     const hasFlag = sessionVal === "true" || localVal === "true" || (sessionVal && sessionVal.length > 0 && sessionVal !== "false") || (localVal && localVal.length > 0 && localVal !== "false");
@@ -1860,7 +1870,26 @@ function saveNewCredentials(e) {
 // 2. DASHBOARD INITIALIZATION & TABS
 // ==========================================
 function initDashboard() {
-    const activeUser = getActiveUser();
+    let activeUser = getActiveUser();
+
+    // Sync activeUser credentials with registered user list (e.g. if role was modified)
+    const registeredUsers = getRegisteredUsers();
+    const updatedActiveUser = registeredUsers.find(u =>
+        (u.username && u.username.toLowerCase() === (activeUser.username || "").toLowerCase()) ||
+        (u.mobile && u.mobile.replace(/[^0-9]/g, "") === (activeUser.mobile || "").replace(/[^0-9]/g, "")) ||
+        (u.id && u.id === activeUser.id)
+    );
+    if (updatedActiveUser) {
+        activeUser.role = updatedActiveUser.role || activeUser.role;
+        activeUser.designation = updatedActiveUser.designation || updatedActiveUser.role || activeUser.role;
+        activeUser.allowedTab = updatedActiveUser.allowedTab || activeUser.allowedTab;
+        activeUser.name = updatedActiveUser.name || activeUser.name;
+        activeUser.email = updatedActiveUser.email || activeUser.email;
+        activeUser.mobile = updatedActiveUser.mobile || activeUser.mobile;
+        sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+    }
+
     const nameEl = document.getElementById("currentLoggedUserName");
     const mobileEl = document.getElementById("currentLoggedUserMobile");
     if (nameEl) nameEl.textContent = activeUser.name || "Administrator";
@@ -1873,12 +1902,14 @@ function initDashboard() {
     const profUser = document.getElementById("profileUsername");
     const profId = document.getElementById("profileUserId");
     const profAvatar = document.getElementById("profileAvatarInitials");
+    const profRoleBadge = document.getElementById("profileRoleBadge");
 
     if (profName) profName.textContent = activeUser.name || "Administrator";
     if (profMobile) profMobile.textContent = activeUser.mobile || "—";
     if (profEmail) profEmail.textContent = activeUser.email || "mehtapratham907@gmail.com";
     if (profUser) profUser.textContent = activeUser.username || "admin";
     if (profId) profId.textContent = activeUser.id || ("usr-" + (activeUser.username || "active"));
+    if (profRoleBadge) profRoleBadge.textContent = activeUser.role || "Staff Member";
     if (profAvatar) {
         const initials = (activeUser.name || "Admin")
             .split(" ")
@@ -3842,13 +3873,32 @@ function deleteStaffAccount(userId) {
 function changeUserRole(userId, newRole) {
     if (!ensureMasterOwnerAuthority()) return;
     let users = getRegisteredUsers();
-    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId || u.mobile === userId);
     if (idx !== -1) {
         users[idx].role = newRole;
-        if (newRole === "Master HQ") {
+        users[idx].designation = newRole;
+        if (newRole === "Master HQ" || newRole === "Managing Director (Owner HQ)") {
             users[idx].allowedTab = "ALL";
         }
         saveRegisteredUsers(users);
+
+        // Update active user session if the modified user is currently logged in
+        const activeUser = getActiveUser();
+        if (activeUser && (
+            (activeUser.username && activeUser.username.toLowerCase() === (users[idx].username || "").toLowerCase()) ||
+            (activeUser.mobile && activeUser.mobile.replace(/[^0-9]/g, "") === (users[idx].mobile || "").replace(/[^0-9]/g, "")) ||
+            (activeUser.id && activeUser.id === users[idx].id)
+        )) {
+            activeUser.role = newRole;
+            activeUser.designation = newRole;
+            if (newRole === "Master HQ" || newRole === "Managing Director (Owner HQ)") {
+                activeUser.allowedTab = "ALL";
+            }
+            sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+            initDashboard();
+        }
+
         showToast(`Role for ${users[idx].name} changed to ${newRole}`, "fa-user-gear");
         renderBandsTable();
     }
@@ -3857,10 +3907,24 @@ function changeUserRole(userId, newRole) {
 function changeUserModule(userId, newModule) {
     if (!ensureMasterOwnerAuthority()) return;
     let users = getRegisteredUsers();
-    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId);
+    const idx = users.findIndex(u => u.id === userId || u.username === userId || u.email === userId || u.mobile === userId);
     if (idx !== -1) {
         users[idx].allowedTab = newModule;
         saveRegisteredUsers(users);
+
+        // Update active user session if the modified user is currently logged in
+        const activeUser = getActiveUser();
+        if (activeUser && (
+            (activeUser.username && activeUser.username.toLowerCase() === (users[idx].username || "").toLowerCase()) ||
+            (activeUser.mobile && activeUser.mobile.replace(/[^0-9]/g, "") === (users[idx].mobile || "").replace(/[^0-9]/g, "")) ||
+            (activeUser.id && activeUser.id === users[idx].id)
+        )) {
+            activeUser.allowedTab = newModule;
+            sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+            initDashboard();
+        }
+
         showToast(`Unlocked module for ${users[idx].name} updated to '${newModule}'`, "fa-lock-open");
         renderBandsTable();
     }
@@ -3933,13 +3997,34 @@ function saveEditStaffForm(e) {
         users[idx].mobile = mobileRaw ? mobileRaw.replace(/[^0-9]/g, "") : users[idx].mobile;
         users[idx].username = username;
         users[idx].role = role;
-        users[idx].allowedTab = role === "Master HQ" ? "ALL" : allowedTab;
+        users[idx].designation = role;
+        users[idx].allowedTab = (role === "Master HQ" || role === "Managing Director (Owner HQ)") ? "ALL" : allowedTab;
         if (role === "Master HQ") users[idx].isMasterUnlocked = true;
         if (pass) users[idx].password = pass;
 
         saveRegisteredUsers(users);
+
+        // Update current active user session if profile was edited
+        const activeUser = getActiveUser();
+        if (activeUser && (
+            (activeUser.username && activeUser.username.toLowerCase() === (users[idx].username || "").toLowerCase()) ||
+            (activeUser.mobile && activeUser.mobile.replace(/[^0-9]/g, "") === (users[idx].mobile || "").replace(/[^0-9]/g, "")) ||
+            (activeUser.id && activeUser.id === users[idx].id)
+        )) {
+            activeUser.name = name;
+            activeUser.email = email;
+            if (mobileRaw) activeUser.mobile = mobileRaw.replace(/[^0-9]/g, "");
+            activeUser.username = username;
+            activeUser.role = role;
+            activeUser.designation = role;
+            activeUser.allowedTab = users[idx].allowedTab;
+            sessionStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+            localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, JSON.stringify(activeUser));
+            initDashboard();
+        }
+
         closeEditStaffModal();
-        showToast(`Updated details & email for ${name}!`, "fa-circle-check");
+        showToast(`Updated details & role for ${name}!`, "fa-circle-check");
         renderBandsTable();
     }
 }
@@ -3990,4 +4075,6 @@ window.clearSelectedImage = clearSelectedImage;
 window.resendApprovalEmail = resendApprovalEmail;
 window.handleOwnerApproveReject = handleOwnerApproveReject;
 window.loginDirectAsOwner = loginDirectAsOwner;
+window.toggleAdminTheme = toggleAdminTheme;
+window.initAdminTheme = initAdminTheme;
 

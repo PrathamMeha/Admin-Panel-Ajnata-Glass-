@@ -45,6 +45,53 @@
         ::-webkit-scrollbar-track { background: #020617; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 999px; }
         ::-webkit-scrollbar-thumb:hover { background: #00B8D9; }
+
+        /* Light Mode Custom Styling Overrides */
+        html.light-mode body {
+            background-color: #f8fafc !important;
+            background-image: radial-gradient(circle at 15% 15%, rgba(0, 184, 217, 0.08) 0%, transparent 40%),
+                              radial-gradient(circle at 85% 85%, rgba(99, 102, 241, 0.08) 0%, transparent 40%) !important;
+            color: #0f172a !important;
+        }
+        html.light-mode header,
+        html.light-mode .bg-slate-900,
+        html.light-mode .bg-slate-900\/80,
+        html.light-mode .bg-slate-900\/60,
+        html.light-mode .bg-slate-900\/95,
+        html.light-mode .bg-slate-950,
+        html.light-mode .bg-slate-950\/95 {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        html.light-mode .bg-slate-900\/40,
+        html.light-mode .bg-slate-800,
+        html.light-mode .bg-slate-800\/80,
+        html.light-mode .bg-slate-800\/50,
+        html.light-mode .bg-slate-800\/60 {
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
+        }
+        html.light-mode .text-white { color: #0f172a !important; }
+        html.light-mode .text-slate-100,
+        html.light-mode .text-slate-200,
+        html.light-mode .text-slate-300 { color: #334155 !important; }
+        html.light-mode .text-slate-400,
+        html.light-mode .text-slate-500 { color: #64748b !important; }
+        html.light-mode .border-slate-800,
+        html.light-mode .border-slate-800\/80,
+        html.light-mode .border-slate-700,
+        html.light-mode .border-slate-700\/80 { border-color: #e2e8f0 !important; }
+        html.light-mode input,
+        html.light-mode select,
+        html.light-mode textarea {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
+        }
+        html.light-mode ::-webkit-scrollbar-track { background: #f8fafc; }
+        html.light-mode ::-webkit-scrollbar-thumb { background: #cbd5e1; }
     </style>
 </head>
 <body class="font-sans antialiased text-slate-100 selection:bg-cyan-500/20 selection:text-cyan-300">
@@ -509,6 +556,12 @@
 
                 <!-- Right: Stats Badges & Actions -->
                 <div class="flex items-center flex-wrap gap-2 sm:gap-3">
+                    <!-- Global Light / Dark Theme Toggle Button -->
+                    <button type="button" onclick="toggleAdminTheme()" id="adminThemeToggleBtn" title="Toggle Light / Dark Mode" class="bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-slate-700/80 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-sm">
+                        <i class="fa-solid fa-sun text-amber-400" id="themeToggleIcon"></i>
+                        <span id="themeToggleText">Light Mode</span>
+                    </button>
+
                     <!-- Return / View Public Website Button (Placed After Login) -->
                     <a href="https://ajantaglass-sirsa.vercel.app/" target="_blank" rel="noopener noreferrer" class="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
                         <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-cyan-400"></i>
@@ -722,7 +775,7 @@
                             <div>
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-lg font-bold text-white" id="profileFullName">Sunny Mehta</h3>
-                                    <span class="bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                    <span id="profileRoleBadge" class="bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                                         Active Account
                                     </span>
                                 </div>
